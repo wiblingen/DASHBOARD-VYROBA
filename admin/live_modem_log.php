@@ -15,57 +15,50 @@ if (!isset($_SESSION) || !is_array($_SESSION)) {
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/language.php';
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/version.php';
 
-// Force the Locale to the stock locale just while we run the update
-setlocale(LC_ALL, "LC_CTYPE=en_GB.UTF-8;LC_NUMERIC=C;LC_TIME=C;LC_COLLATE=C;LC_MONETARY=C;LC_MESSAGES=C;LC_PAPER=C;LC_NAME=C;LC_ADDRESS=C;LC_TELEPHONE=C;LC_MEASUREMENT=C;LC_IDENTIFICATION=C");
-
 // Sanity Check that this file has been opened correctly
-if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
-
-   if (!isset($_GET['ajax'])) {
-    if (!file_exists('/var/log/pi-star')) {
-      system('sudo mkdir -p /var/log/pi-star/');
-      system('sudo chmod 775 /var/log/pi-star/');
-      system('sudo chown root:mmdvm /var/log/pi-star/');
-    }
-     system('sudo touch /var/log/pi-star/pi-star_update.log > /dev/null 2>&1 &');
-     system('sudo echo "" > /var/log/pi-star/pi-star_update.log > /dev/null 2>&1 &');
-     system('sudo /usr/local/sbin/pistar-update > /dev/null 2>&1 &');
-  }
-
-  // Sanity Check Passed.
-  header('Cache-Control: no-cache');
-
-  if (!isset($_GET['ajax'])) {
-    //unset($_SESSION['update_offset']);
-    if (file_exists('/var/log/pi-star/pi-star_update.log')) {
-      $_SESSION['update_offset'] = filesize('/var/log/pi-star/pi-star_update.log');
-    } else {
-      $_SESSION['update_offset'] = 0;
-    }
-  }
-  
-  if (isset($_GET['ajax'])) {
-    //session_start();
-    if (!file_exists('/var/log/pi-star/pi-star_update.log')) {
-      exit();
+if ($_SERVER["PHP_SELF"] == "/admin/live_modem_log.php") {
+    
+    // Sanity Check Passed.
+    header('Cache-Control: no-cache');
+    
+    if (!isset($_GET['ajax'])) {
+	unset($_SESSION['offset']);
+	//$_SESSION['offset'] = 0;
     }
     
-    $handle = fopen('/var/log/pi-star/pi-star_update.log', 'rb');
-    if (isset($_SESSION['update_offset'])) {
-      fseek($handle, 0, SEEK_END);
-      if ($_SESSION['update_offset'] > ftell($handle)) //log rotated/truncated
-        $_SESSION['update_offset'] = 0; //continue at beginning of the new log
-      $data = stream_get_contents($handle, -1, $_SESSION['update_offset']);
-      $_SESSION['update_offset'] += strlen($data);
-      echo nl2br($data);
-      }
-    else {
-      fseek($handle, 0, SEEK_END);
-      $_SESSION['update_offset'] = ftell($handle);
-      } 
-  exit();
-  }
-  
+    if (isset($_GET['ajax'])) {
+	if (file_exists('/etc/dstar-radio.mmdvmhost')) {
+	    $logfile = "/var/log/pi-star/MMDVM-".gmdate('Y-m-d').".log";
+	}
+	else if (file_exists('/etc/dstar-radio.dstarrepeater')) {
+	    if (file_exists("/var/log/pi-star/DStarRepeater-".gmdate('Y-m-d').".log")) {
+		$logfile = "/var/log/pi-star/DStarRepeater-".gmdate('Y-m-d').".log";
+	    }
+	    else if (file_exists("/var/log/pi-star/dstarrepeaterd-".gmdate('Y-m-d').".log")) {
+		$logfile = "/var/log/pi-star/dstarrepeaterd-".gmdate('Y-m-d').".log";
+	    }
+	}
+	
+	if (empty($logfile) || !file_exists($logfile)) {
+	    exit();
+	}
+	
+	$handle = fopen($logfile, 'rb');
+	if (isset($_SESSION['offset'])) {
+	    fseek($handle, 0, SEEK_END);
+	    if ($_SESSION['offset'] > ftell($handle)) { //log rotated/truncated
+		$_SESSION['offset'] = 0; //continue at beginning of the new log
+	    }
+	    $data = stream_get_contents($handle, -1, $_SESSION['offset']);
+	    $_SESSION['offset'] += strlen($data);
+	    echo nl2br($data);
+	}
+	else {
+	    fseek($handle, 0, SEEK_END);
+	    $_SESSION['offset'] = ftell($handle);
+	} 
+	exit();
+    }
 ?>
   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -76,13 +69,13 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
     <meta name="language" content="English" />
     <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
     <meta name="Author" content="Andrew Taylor (MW0MWZ), Chip Cuccio (W0CHP)" />
-    <meta name="Description" content="Pi-Star Update" />
+    <meta name="Description" content="Pi-Star Live Modem Log" />
     <meta name="KeyWords" content="MMDVMHost,ircDDBGateway,D-Star,ircDDB,DMRGateway,DMR,YSFGateway,YSF,C4FM,NXDNGateway,NXDN,P25Gateway,P25,Pi-Star,DL5DI,DG9VH,MW0MWZ,W0CHP" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="pragma" content="no-cache" />
 <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
     <meta http-equiv="Expires" content="0" />
-    <title>Pi-Star - <?php echo $lang['digital_voice']." ".$lang['dashboard']." - ".$lang['update'];?></title>
+    <title>Pi-Star - <?php echo $lang['digital_voice']." ".$lang['dashboard']." - ".$lang['live_logs'];?></title>
     <link rel="stylesheet" type="text/css" href="/css/pistar-css.php?version=<?php echo $versionCmd; ?>" />
     <link rel="stylesheet" type="text/css" href="/css/font-awesome-4.7.0/css/font-awesome.min.css" />
     <script type="text/javascript" src="/js/jquery.min.js?version=<?php echo $versionCmd; ?>"></script>
@@ -90,7 +83,7 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
     <script type="text/javascript">
     $(function() {
       $.repeat(1000, function() {
-        $.get('/admin/update.php?ajax', function(data) {
+        $.get('/admin/live_modem_log.php?ajax', function(data) {
           if (data.length < 1) return;
           var objDiv = document.getElementById("tail");
           var isScrolledToBottom = objDiv.scrollHeight - objDiv.clientHeight <= objDiv.scrollTop + 1;
@@ -105,8 +98,13 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
   <body>
       <div class="container">
 	  <div class="header">
-	      <div class="SmallHeader shLeft">Hostname: <?php echo exec('cat /etc/hostname'); ?></div><div class="SmallHeader shRight">Pi-Star: Ver.#  <?php echo $_SESSION['PiStarRelease']['Pi-Star']['Version'].'<br />';?> <?php echo $version; ?></div>
-	      <h1>Pi-Star - <?php echo $lang['digital_voice']." ".$lang['dashboard']." - ".$lang['update'];?></h1>
+	      <div class="SmallHeader shLeft">Hostname: <?php echo exec('cat /etc/hostname'); ?></div><div class="SmallHeader shRight">Pi-Star: Ver.#  <?php echo $_SESSION['PiStarRelease']['Pi-Star']['Version'].'<br />';?>
+	      <?php if (constant("AUTO_UPDATE_CHECK") == "true") { ?> 
+	      <div id="CheckUpdate"><?php echo $version; system('/usr/local/sbin/pistar-check4updates'); ?></div></div>
+	      <?php } else { ?>
+	      <div id="CheckUpdate"><?php echo $version; ?></div></div>
+	      <?php } ?>    
+	      <h1>Pi-Star <?php echo $lang['digital_voice']." - ".$lang['live_logs'];?></h1>
 	      <p>
 		  <div class="navbar">
               <script type= "text/javascript">
@@ -144,15 +142,21 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
 		  </div>
 	      </p>
 	  </div>
-  <div class="contentwide">
-  <table width="100%">
-  <tr><td align="left"><div id="tail">Starting update, please wait...<br /></div></td></tr>
-  </table>
-  </div>
-  <div class="footer">
-      2022-<?php echo date("Y"); ?>.<br />
+	  <div class="contentwide">
+	      <table width="100%">
+		  <tr><th><?php echo $lang['live_logs'];?></th></tr>
+		  <tr><td align="left"><div id="tail">Starting logging, please wait...<br /></div></td></tr>
+		  <tr><th align="right">
+		      <button class="button" onclick="location.href='/admin/download_modem_log.php'" style="margin:2px 5px;">Download This Log</button>
+		      <button class="button" onclick="location.href='/admin/download_all_logs.php'" style="margin:2px 5px;">Download All Logs</button>
+		  </th></tr>
+	      </table>
+	  </div>
+	  <div class="footer">
+	      2022-<?php echo date("Y"); ?>.<br />
 		<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov<br />
-  </div>
+	  </div>
+      </div>
   </body>
   </html>
 

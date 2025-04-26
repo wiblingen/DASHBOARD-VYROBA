@@ -23,33 +23,6 @@ $configmmdvm = parse_ini_file($mmdvmConfigFile, true);
 $aprsConfigFile = '/etc/aprsgateway';
 $configaprsgw = parse_ini_file($aprsConfigFile, true);
 
-function manageGateways($func,$service) { // we need to also stop the associated mode gateways when pausing modes...
-// ...otherwise if the mode is TX'ing when paused, it will show infinite TX in the dashboard.
-    $service = escapeshellcmd($_POST['mode_sel']);
-    $service = strtolower($service);
-
-    // POSCAG mode uses DAPNETGateway service; translate it...
-    if ($service == "pocsag") {
-	$service = "dapnet";
-    }
-    // D-Star mode uses ircddbgateway service; translate...
-    if ($service == "dstar") {
-	$service = "ircddb";
-    }
-
-    // manage the services...
-    exec("sudo systemctl $func $service"."gateway.timer");
-    exec("sudo systemctl $func $service"."gateway.service");
-
-    // check that no other modes are paused. If so, we can manage the watchdog service.
-    // if we don't stop the watchdog, it will (re-)start the stopped gateway for the paused mode. We don't want that...
-    $is_paused = glob('/etc/*_paused');
-    if (empty($is_paused) == TRUE) {
-        exec("sudo systemctl $func pistar-watchdog.timer");
-        exec("sudo systemctl $func pistar-watchdog.service");
-    }
-}
-
 // check status of supported modes
 $DSTAR  = ($configmmdvm['D-Star']['Enable']);
 $DMR    = ($configmmdvm['DMR']['Enable']);
@@ -79,7 +52,7 @@ if (!empty($_POST["submit_mode"]) && empty($_POST["mode_sel"])) { //handler for 
     echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},3000);</script>';
 } elseif
     (!empty($_POST['submit_mode']) && escapeshellcmd($_POST['mode_action'] == "Pause")) {
-    $mode = escapeshellcmd($_POST['mode_sel']); // get selected mode from form post
+    $mode = escapeshellcmd($_POST['mode_sel']); // get selected mode from for post
     if (isPaused($mode)) { //check if already paused
         // Output to the browser
         echo "<b>Instant Mode Manager</b>\n";
@@ -95,7 +68,6 @@ if (!empty($_POST["submit_mode"]) && empty($_POST["mode_sel"])) { //handler for 
         unset($_POST);
         echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},3000);</script>';
     } else { // looks good!
-	manageGateways("stop", $service);
         exec("sudo $mode_cmd $mode Disable"); // pause the seleced $mode
         // Output to the browser
         echo "<b>Instant Mode Manager</b>\n";
@@ -130,7 +102,6 @@ if (!empty($_POST["submit_mode"]) && empty($_POST["mode_sel"])) { //handler for 
         echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},3000);</script>';
     } else { // looks good!
         exec("sudo $mode_cmd $mode Enable"); // resume the seleced $mode
-	manageGateways("start", $service);
         // Output to the browser
         echo "<b>Instant Mode Manager</b>\n";
         echo "<table>\n";

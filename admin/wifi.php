@@ -4,7 +4,6 @@ if (!isset($_SESSION) || !is_array($_SESSION)) {
     session_start();
 
     include_once $_SERVER['DOCUMENT_ROOT'].'/config/config.php';          // MMDVMDash Config
-    include_once $_SERVER['DOCUMENT_ROOT'].'/config/version.php';         // Version Config
     include_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/tools.php';        // MMDVMDash Tools
     include_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/functions.php';    // MMDVMDash Functions
     include_once $_SERVER['DOCUMENT_ROOT'].'/config/language.php';        // Translation Code
@@ -21,13 +20,16 @@ echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="Author" content="Andrew Taylor (MW0MWZ), Chip Cuccio (W0CHP)" />
+<meta name="Description" content="Pi-Star Configuration" />
+<meta name="KeyWords" content="MMDVMHost,ircDDBGateway,D-Star,ircDDB,DMRGateway,DMR,YSFGateway,YSF,C4FM,NXDNGateway,NXDN,P25Gateway,P25,Pi-Star,DL5DI,DG9VH,MW0MWZ,W0CHP" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="pragma" content="no-cache" />
 <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
-<meta http-equiv="Expires" content="0" />';
-include_once $_SERVER['DOCUMENT_ROOT'].'/config/browserdetect.php';
-echo '<link rel="stylesheet" type="text/css" href="/admin/wifi/styles.php?version='.$versionCmd.'" />
-<script type="text/Javascript" src="/admin//wifi/functions.js?version='.$versionCmd.'"></script>
+<meta http-equiv="Expires" content="0" />
+<link rel="stylesheet" type="text/css" href="/css/pistar-css.php?version=<?php echo $versionCmd; ?>" />
+<link rel="stylesheet" type="text/css" href="/admin/wifi/styles.php?version<?php echo $versionCmd; ?>" />
+<script type="text/Javascript" src="/admin//wifi/functions.js"></script>
 <title>Pi-Star - Digital Voice Dashboard - WiFi Config</title>
 </head>
 <body>'."\n";
@@ -63,7 +65,7 @@ switch($page) {
 			$strHWAddress = $result[1];
 		}
 		if(strpos($strWlan0, "UP") !== false && strpos($strWlan0, "RUNNING") !== false) {
-			$strStatus = '<span style="color:#6f0;background:black;">Interface is active</span>';
+			$strStatus = '<span style="color:#6f0;background:black;">Interface is up</span>';
 				//Cant get these unless we are connected :)
 				if (strpos($strWlan0,'inet addr:') !== false) {
 					preg_match('/inet addr:([0-9.]+)/i',$strWlan0,$result);
@@ -133,7 +135,7 @@ switch($page) {
 				$strWifiChan = ConvertToChannel(str_replace(".", "", $strWifiChan)); }
 		}
 		else {
-			$strStatus = '<span style="color:#EE4B2B;background:black;">Interface is inactive</span>';
+			$strStatus = '<span style="color:#EE4B2B;background:black;">Interface is down</span>';
 		}
 		if(isset($_POST['ifdown_wlan0'])) {
 			exec('ifconfig wlan0 | grep -i running | wc -l',$test);
@@ -311,7 +313,7 @@ echo '<br />
 		}
 		}
 		file_put_contents('/tmp/wifidata', $config);
-		system('sudo mount -o remount,rw / && sudo cp -f /tmp/wifidata /etc/wpa_supplicant/wpa_supplicant.conf && sudo sync && sudo sync && sudo sync');
+		system('sudo mount -o remount,rw / && sudo cp -f /tmp/wifidata /etc/wpa_supplicant/wpa_supplicant.conf && sudo sync && sudo sync && sudo sync && sudo mount -o remount,ro /');
 		echo "Wifi Settings Updated Successfully\n";
 		// If Auto AP is on, dont restart the WiFi Card
 		if (!file_exists('/sys/class/net/wlan0_ap')) {
