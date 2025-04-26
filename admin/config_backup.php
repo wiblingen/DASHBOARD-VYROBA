@@ -36,16 +36,13 @@ if ($_SERVER["PHP_SELF"] == "/admin/config_backup.php") {
 	    <meta name="robots" content="follow" />
 	    <meta name="language" content="English" />
 	    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	    <meta name="Author" content="Andrew Taylor (MW0MWZ)" />
-	    <meta name="Description" content="Pi-Star Configuration Backup" />
-	    <meta name="KeyWords" content="MMDVMHost,ircDDBGateway,D-Star,ircDDB,DMRGateway,DMR,YSFGateway,YSF,C4FM,NXDNGateway,NXDN,P25Gateway,P25,Pi-Star,DL5DI,DG9VH,MW0MWZ,F1RMB,W0CHP" />
 	    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 	    <meta http-equiv="pragma" content="no-cache" />
 	    <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
 	    <meta http-equiv="Expires" content="0" />
 	    <title>Pi-Star - <?php echo $lang['digital_voice']." ".$lang['dashboard']." - ".$lang['backup_restore'];?></title>
 	    <link rel="stylesheet" type="text/css" href="/css/font-awesome-4.7.0/css/font-awesome.min.css" />
-	    <link rel="stylesheet" type="text/css" href="/css/pistar-css.php?version=<?php echo $versionCmd; ?>" />
+<?php include_once $_SERVER['DOCUMENT_ROOT'].'/config/browserdetect.php'; ?>
 	</head>
 	<body>
 	    <div class="container">
@@ -201,7 +198,7 @@ if ($_SERVER["PHP_SELF"] == "/admin/config_backup.php") {
 				$output .= "Stopping Services.\n";
 				
 				// Stop the DV Services
-			    	shell_exec('sudo REMOUNT_RO="NO" pistar-services fullstop > /dev/null');
+			    	shell_exec('sudo pistar-services fullstop > /dev/null');
 	
 				// Make the disk Writable
 				shell_exec('sudo mount -o remount,rw / > /dev/null');
@@ -234,7 +231,6 @@ if ($_SERVER["PHP_SELF"] == "/admin/config_backup.php") {
 				shell_exec('sudo /usr/local/sbin/HostFilesUpdate.sh > /dev/null');
 				
 				// Make the disk Read-Only
-				shell_exec('sudo mount -o remount,ro / > /dev/null');
 				
 				// Start the services
 				$output .= "Starting Services.\n";
@@ -290,8 +286,8 @@ if ($_SERVER["PHP_SELF"] == "/admin/config_backup.php") {
 		    <?php } ?>
 		</div>
 		<div class="footer">
-		    2022-<?php echo date("Y"); ?>.<br />
-		<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov<br />
+		    Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-<?php echo date("Y"); ?>.<br />
+			<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP<br />
 		</div>
 	    </div>
 	</body>

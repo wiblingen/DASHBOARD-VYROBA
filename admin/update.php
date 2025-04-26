@@ -75,15 +75,12 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
     <meta name="robots" content="follow" />
     <meta name="language" content="English" />
     <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-    <meta name="Author" content="Andrew Taylor (MW0MWZ), Chip Cuccio (W0CHP)" />
-    <meta name="Description" content="Pi-Star Update" />
-    <meta name="KeyWords" content="MMDVMHost,ircDDBGateway,D-Star,ircDDB,DMRGateway,DMR,YSFGateway,YSF,C4FM,NXDNGateway,NXDN,P25Gateway,P25,Pi-Star,DL5DI,DG9VH,MW0MWZ,W0CHP" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="pragma" content="no-cache" />
 <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
     <meta http-equiv="Expires" content="0" />
     <title>Pi-Star - <?php echo $lang['digital_voice']." ".$lang['dashboard']." - ".$lang['update'];?></title>
-    <link rel="stylesheet" type="text/css" href="/css/pistar-css.php?version=<?php echo $versionCmd; ?>" />
+<?php include_once $_SERVER['DOCUMENT_ROOT'].'/config/browserdetect.php'; ?>
     <link rel="stylesheet" type="text/css" href="/css/font-awesome-4.7.0/css/font-awesome.min.css" />
     <script type="text/javascript" src="/js/jquery.min.js?version=<?php echo $versionCmd; ?>"></script>
     <script type="text/javascript" src="/js/jquery-timing.min.js?version=<?php echo $versionCmd; ?>"></script>
@@ -112,14 +109,14 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
               <script type= "text/javascript">
                $(document).ready(function() {
                  setInterval(function() {
-                   $("#timer").load("/dstarrepeater/datetime.php");
+                   $("#timer").load("/includes/datetime.php");
                    }, 1000);
 
                  function update() {
                    $.ajax({
                      type: 'GET',
                      cache: false,
-                     url: '/dstarrepeater/datetime.php',
+                     url: '/includes/datetime.php',
                      timeout: 1000,
                      success: function(data) {
                        $("#timer").html(data); 
@@ -150,8 +147,9 @@ if ($_SERVER["PHP_SELF"] == "/admin/update.php") {
   </table>
   </div>
   <div class="footer">
-      2022-<?php echo date("Y"); ?>.<br />
-		<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov<br />
+      Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-<?php echo date("Y"); ?>.<br />
+	  <a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP<br />
+  </div>
   </div>
   </body>
   </html>

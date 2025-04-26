@@ -1,20 +1,40 @@
 <?php
-if (!isset($_SESSION) || !is_array($_SESSION)) {
-    session_id('pistardashsess');
-    session_start();
-
-    include_once $_SERVER['DOCUMENT_ROOT'].'/config/config.php';          // MMDVMDash Config
-    include_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/tools.php';        // MMDVMDash Tools
-    include_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/functions.php';    // MMDVMDash Functions
-    include_once $_SERVER['DOCUMENT_ROOT'].'/config/language.php';        // Translation Code
-    checkSessionValidity();
-}
+session_set_cookie_params(0, "/");
+session_name("PiStar_Dashboard_Session");
+session_id('pistardashsess');
+session_start();
 
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/version.php';
-require_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/functions.php';
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/ircddblocal.php';
+require_once $_SERVER['DOCUMENT_ROOT'].'/mmdvmhost/functions.php';
 require_once $_SERVER['DOCUMENT_ROOT'].'/config/language.php';
+
+// Clear session data (page {re}load);
+unset($_SESSION['BMAPIKey']);
+unset($_SESSION['DAPNETAPIKeyConfigs']);
+unset($_SESSION['PiStarRelease']);
+unset($_SESSION['MMDVMHostConfigs']);
+unset($_SESSION['ircDDBConfigs']);
+unset($_SESSION['DStarRepeaterConfigs']);
+unset($_SESSION['DMRGatewayConfigs']);
+unset($_SESSION['YSFGatewayConfigs']);
+unset($_SESSION['DGIdGatewayConfigs']);
+unset($_SESSION['DAPNETGatewayConfigs']);
+unset($_SESSION['YSF2DMRConfigs']);
+unset($_SESSION['YSF2NXDNConfigs']);
+unset($_SESSION['YSF2P25Configs']);
+unset($_SESSION['DMR2YSFConfigs']);
+unset($_SESSION['DMR2NXDNConfigs']);
+unset($_SESSION['APRSGatewayConfigs']);
+unset($_SESSION['NXDNGatewayConfigs']);
+unset($_SESSION['P25GatewayConfigs']);
+unset($_SESSION['CSSConfigs']);
+unset($_SESSION['DvModemFWVersion']);
+unset($_SESSION['DvModemTCXOFreq']);
+unset($_SESSION['M17GatewayConfigs']);
+
+checkSessionValidity();
 
 // Load the pistar-release file
 $pistarReleaseConfig = '/etc/pistar-release';
@@ -131,7 +151,7 @@ if (file_exists('/etc/dapnetgateway')) {
 // APRS Gateway config
 if (file_exists('/etc/aprsgateway')) {
 	$configAPRSconfigFile = '/etc/aprsgateway';
-	if (fopen($configAPRSconfigFile,'r')) { $configaprsgw = parse_ini_file($configAPRSconfigFile, true); }
+	if (fopen($configAPRSconfigFile,'r')) { $configaprsgateway = parse_ini_file($configAPRSconfigFile, true); }
 }
 
 // Load the dmrgateway config file
@@ -157,7 +177,6 @@ if (file_exists('/etc/mobilegps'))
 {
     exec('sudo mount -o remount,rw /');
     exec('sudo rm -f /etc/mobilegps');
-    //exec('sudo sync && sudo sync && sudo sync && sudo mount -o remount,ro /');
 }
 // Convert MMDVMHost config file
 if (isset($configmmdvm['Mobile GPS'])) {
@@ -257,7 +276,6 @@ if (isset($configmmdvm['DMR Network']['Type'])) {
 if (isset($configs['aprsHostname'])) {
     exec('sudo mount -o remount,rw /');
     exec('sudo sed -i "/mobileGPS.*/d;/aprsPassword.*/d;s/aprsHostname=.*/aprsAddress=127.0.0.1/g;s/aprsPort=.*/aprsPort=8673/g" /etc/ircddbgateway');
-    //exec('sudo sync && sudo sync && sudo sync && sudo mount -o remount,ro /');
 
     // re-init iscddbgw config
     // Load the ircDDBGateway config file
@@ -316,6 +334,38 @@ if (!isset($configdmrgateway['Remote Control'])) {
     $configdmrgateway['Remote Control']['Enable'] = "1";
     $configdmrgateway['Remote Control']['Port'] = "7643";
     $configdmrgateway['Remote Control']['Address'] = "127.0.0.1";
+}
+
+// Checks for NextionDriver and inits if non-existent...
+if (!isset($configmmdvm['NextionDriver'])) {
+    $configmmdvm['NextionDriver']['Enable'] = "0";
+    $configmmdvm['NextionDriver']['Port'] = "0";
+    $configmmdvm['NextionDriver']['DataFilesPath'] = "/usr/local/etc/";
+    $configmmdvm['NextionDriver']['LogLevel'] = "2";
+    $configmmdvm['NextionDriver']['GroupsFile'] = "groups.txt";
+    $configmmdvm['NextionDriver']['DMRidFile'] = "stripped.csv";
+    $configmmdvm['NextionDriver']['ShowModeStatus'] = "0";
+    $configmmdvm['NextionDriver']['RemoveDim'] = "0";
+    $configmmdvm['NextionDriver']['WaitForLan'] = "1";
+    $configmmdvm['NextionDriver']['SleepWhenInactive'] = "0";
+}
+if (!isset($configmmdvm['NextionDriver']['Enable'])) {
+    $configmmdvm['NextionDriver']['Enable'] = "0";
+}
+if (!isset($configmmdvm['Transparent Data'])) {
+    $configmmdvm['Transparent Data']['Enable'] = "0";
+    $configmmdvm['Transparent Data']['RemoteAddress'] = "127.0.0.1";
+    $configmmdvm['Transparent Data']['RemotePort'] = "40094";
+    $configmmdvm['Transparent Data']['LocalPort'] = "40095";
+}
+if (($configmmdvm['General']['Display'] == "Nextion") && ($configmmdvm['NextionDriver']['Enable'] == "1")) {
+    if ($configmmdvm['Transparent Data']['Enable'] == "1") {
+	$configmmdvm['General']['Display'] = "NextionDriverTrans";
+    }
+    else {
+	$configmmdvm['General']['Display'] = "NextionDriver";
+    }
+    $configmmdvm['Nextion']['Port'] = $configmmdvm['NextionDriver']['Port'];
 }
 
 // New MMDVMHost uart stuff
@@ -413,10 +463,6 @@ $MYCALL=strtoupper($callsign);
     <meta name="robots" content="follow" />
     <meta name="language" content="English" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <?php echo "<meta name=\"generator\" content=\"$version\" />\n"; ?>
-    <meta name="Author" content="Andrew Taylor (MW0MWZ), Chip Cuccio (W0CHP)" />
-    <meta name="Description" content="Pi-Star Configuration" />
-    <meta name="KeyWords" content="Pi-Star" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="pragma" content="no-cache" />
     <link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
@@ -481,7 +527,7 @@ $MYCALL=strtoupper($callsign);
           $('.ysf2p25StartupDstId').select2({searchInputPlaceholder: 'Search...'});
           $('.p25StartupHost').select2({searchInputPlaceholder: 'Search...'});
           $('.nxdnStartupHost').select2({searchInputPlaceholder: 'Search...'});
-          $('.systemTimezone').select2({searchInputPlaceholder: 'Search...'});
+          $('.systemTimezone').select2({searchInputPlaceholder: 'Search...', width: '175px'});
           $('.confHardware').select2({searchInputPlaceholder: 'Search...', width: '400px'});
 	  $(".confDefRef").select2({
 	    tags: true,
@@ -520,6 +566,16 @@ $MYCALL=strtoupper($callsign);
 	  var input = $("#tgifHSSecurity");
 	  input.attr('type') === 'password' ? input.attr('type','text') : input.attr('type','password')
 	});
+	$(document).on('click', '.toggle-ircddb-password', function() {
+	  $(this).toggleClass("fa-eye fa-eye-slash");
+	  var input = $("#ircddbPass");
+	  input.attr('type') === 'password' ? input.attr('type','text') : input.attr('type','password')
+	});
+	$(document).on('click', '.toggle-dapnet-password', function() {
+	  $(this).toggleClass("fa-eye fa-eye-slash");
+	  var input = $("#pocsagAuthKey");
+	  input.attr('type') === 'password' ? input.attr('type','text') : input.attr('type','password')
+	});
 
     </script>
     <script type="text/javascript" src="/js/functions.js?version=<?php echo $versionCmd; ?>"></script>
@@ -539,6 +595,24 @@ if ( (file_exists('/etc/dstar-radio.mmdvmhost') && $configmmdvm['DMR']['Enable']
 }
 ?>
 <?php
+// warn to backup configs, only if this is not a new installation.
+$config_dir = "/etc/WPSD_config_mgr";
+if (!is_dir($config_dir) || count(glob("$config_dir/*")) < 1) { // no saved configs
+    if (file_exists('/etc/dstar-radio.mmdvmhost') || file_exists('/etc/dstar-radio.dstarrepeater')) { // NOT a new installaion
+?>
+<div>
+  <table align="center"style="margin: 0px 0px 10px 0px; width: 100%;border-collapse:collapse; table-layout:fixed;white-space: normal!important;">
+    <tr>
+    <td align="center" valign="top" style="background-color: #ffff90; color: #906000; word-wrap: break-all;padding:20px;">Notice! You do not have any saved configuration / profiles.<br /><br />
+    It is recommended that you <b><a href="/admin/advanced/config_manager.php">save your configuration / profile before making any changes</a>.</b></td>
+    </tr>
+  </table>
+</div>
+<?php
+    }
+}
+?>
+<?php
 $bmAPIkeyFile = '/etc/bmapi.key';
 if (file_exists($bmAPIkeyFile) && fopen($bmAPIkeyFile,'r')) {
   $configBMapi = parse_ini_file($bmAPIkeyFile, true);
@@ -549,7 +623,7 @@ if (file_exists($bmAPIkeyFile) && fopen($bmAPIkeyFile,'r')) {
 <div>
   <table align="center"style="margin: 0px 0px 10px 0px; width: 100%;border-collapse:collapse; table-layout:fixed;white-space: normal!important;">
     <tr>
-    <td align="center" valign="top" style="background-color: #ffff90; color: #906000; word-wrap: break-all;padding:20px;">Notice! You have a legacy Brandmeister API v1 Key. Read the announcement on how to migrate: <a href="https://news.brandmeister.network/introducing-user-api-keys/" target="new" alt="BM API Keys">BM API Key Announcement and Migration Instructions</a>; and then <a href="/admin/expert/fulledit_bmapikey.php">Update your API Key</a>.</td>
+    <td align="center" valign="top" style="background-color: #ffff90; color: #906000; word-wrap: break-all;padding:20px;">Notice! You have a legacy Brandmeister API v1 Key. Read the announcement on how to migrate: <a href="https://news.brandmeister.network/introducing-user-api-keys/" target="new" alt="BM API Keys">BM API Key Announcement and Migration Instructions</a>; and then <a href="/admin/advanced/fulledit_bmapikey.php">Update your API Key</a> to delete this message and to ensure BM Manager continues to work properly..</td>
     </tr>
   </table>
 </div>
@@ -569,14 +643,14 @@ if (file_exists($bmAPIkeyFile) && fopen($bmAPIkeyFile,'r')) {
               <script type= "text/javascript">
                $(document).ready(function() {
                  setInterval(function() {
-                   $("#timer").load("/dstarrepeater/datetime.php");
+                   $("#timer").load("/includes/datetime.php");
                    }, 1000);
 
                  function update() {
                    $.ajax({
                      type: 'GET',
                      cache: false,
-                     url: '/dstarrepeater/datetime.php',
+                     url: '/includes/datetime.php',
                      timeout: 1000,
                      success: function(data) {
                        $("#timer").html(data); 
@@ -593,7 +667,7 @@ if (file_exists($bmAPIkeyFile) && fopen($bmAPIkeyFile,'r')) {
 			<a class="menureset" href="javascript:factoryReset();"><?php echo $lang['factory_reset'];?></a>
 			<a class="menubackup" href="/admin/config_backup.php"><?php echo $lang['backup_restore'];?></a>
 			<a class="menuupdate" href="/admin/update.php"><?php echo $lang['update'];?></a>
-			<a class="menuexpert" href="/admin/expert/">Expert</a>
+			<a class="menuexpert" href="/admin/advanced/">Advanced</a>
 			<a class="menupower" href="/admin/power.php"><?php echo $lang['power'];?></a>
 			<a class="menuadmin" href="/admin/"><?php echo $lang['admin'];?></a>
 			<?php if (file_exists("/etc/dstar-radio.mmdvmhost")) { ?>
@@ -623,7 +697,7 @@ if (!empty($is_paused)) {
     echo '</div>';
     echo '<div class="footer">';
     echo 'Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-'.date("Y").'.<br />';
-    echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> enhancements by W0CHP';
+    echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
     echo '<br />';
     echo '</div>';
     echo '</div>';
@@ -637,6 +711,103 @@ if ($_SERVER["PHP_SELF"] == "/admin/configure.php") {
 if (!empty($_POST)):
 	// Make the root filesystem writable
 	system('sudo mount -o remount,rw /');
+
+	// SysX migration to its own section/config
+	if (empty($_POST['MigrateSysX']) != TRUE ) {
+	    unset($configdmrgateway['DMR Network 5']);
+	    $configdmrgateway['DMR Network 5']['Enabled'] = $configdmrgateway['DMR Network 2']['Enabled'];
+	    $configdmrgateway['DMR Network 5']['Id'] = $configdmrgateway['DMR Network 2']['Id'];
+	    $configdmrgateway['DMR Network 5']['Name'] = $configdmrgateway['DMR Network 2']['Name'];
+	    $configdmrgateway['DMR Network 5']['Address'] = $configdmrgateway['DMR Network 2']['Address'];
+	    $configdmrgateway['DMR Network 5']['Port'] = $configdmrgateway['DMR Network 2']['Port'];
+	    $configdmrgateway['DMR Network 5']['Password'] = $configdmrgateway['DMR Network 2']['Password'];
+	    $configdmrgateway['DMR Network 5']['Options'] = $configdmrgateway['DMR Network 2']['Options'];
+            $configdmrgateway['DMR Network 5']['Debug'] = "0";
+            $configdmrgateway['DMR Network 5']['Location'] = "0";
+            $configdmrgateway['DMR Network 5']['TGRewrite0'] = "2,4,2,9,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite0'] = "2,44000,2,4000,1001";
+            $configdmrgateway['DMR Network 5']['PCRewrite1'] = "1,4009990,1,9990,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite2'] = "2,4009990,2,9990,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite3'] = "1,4000001,1,1,999999";
+            $configdmrgateway['DMR Network 5']['PCRewrite4'] = "2,4000001,2,1,999999";
+            $configdmrgateway['DMR Network 5']['TypeRewrite1'] = "1,4009990,1,9990";
+            $configdmrgateway['DMR Network 5']['TypeRewrite2'] = "2,4009990,2,9990";
+            $configdmrgateway['DMR Network 5']['TGRewrite1'] = "1,4000001,1,1,999999";
+            $configdmrgateway['DMR Network 5']['TGRewrite2'] = "2,4000001,2,1,999999";
+            $configdmrgateway['DMR Network 5']['SrcRewrite1'] = "1,9990,1,4009990,1";
+            $configdmrgateway['DMR Network 5']['SrcRewrite2'] = "2,9990,2,4009990,1";
+            $configdmrgateway['DMR Network 5']['SrcRewrite3'] = "1,1,1,4000001,999999";
+            $configdmrgateway['DMR Network 5']['SrcRewrite4'] = "2,1,2,4000001,999999";
+	    unset($configdmrgateway['DMR Network 2']);
+	    // quote options= line
+	    if (isset($configdmrgateway['DMR Network 5']['Options'])) {
+                ensureOptionsIsQuoted($configdmrgateway['DMR Network 5']['Options']);
+	    }
+	    // quote certain values when migrating
+	    if ( isset($configdmrgateway['Info']['Location']) && substr($configdmrgateway['Info']['Location'], 0, 1) !== '"' ) { $configdmrgateway['Info']['Location'] = '"'.$configdmrgateway['Info']['Location'].'"'; }
+	    if ( isset($configdmrgateway['Info']['Description']) && substr($configdmrgateway['Info']['Description'], 0, 1) !== '"' ) { $configdmrgateway['Info']['Description'] = '"'.$configdmrgateway['Info']['Description'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 1']['Password']) && substr($configdmrgateway['DMR Network 1']['Password'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 1']['Password'] = '"'.$configdmrgateway['DMR Network 1']['Password'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 1']['Options']) &&  substr($configdmrgateway['DMR Network 1']['Options'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 1']['Options'] = '"'.$configdmrgateway['DMR Network 1']['Options'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 2']['Password']) && substr($configdmrgateway['DMR Network 2']['Password'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 2']['Password'] = '"'.$configdmrgateway['DMR Network 2']['Password'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 2']['Options']) &&  substr($configdmrgateway['DMR Network 2']['Options'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 2']['Options'] = '"'.$configdmrgateway['DMR Network 2']['Options'].'"'; }
+	   if ( isset($configdmrgateway['DMR Network 3']['Password']) && substr($configdmrgateway['DMR Network 3']['Password'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 3']['Password'] = '"'.$configdmrgateway['DMR Network 3']['Password'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 3']['Options']) &&  substr($configdmrgateway['DMR Network 3']['Options'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 3']['Options'] = '"'.$configdmrgateway['DMR Network 3']['Options'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 4']['Password']) && substr($configdmrgateway['DMR Network 4']['Password'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 4']['Password'] = '"'.$configdmrgateway['DMR Network 4']['Password'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 4']['Options']) &&  substr($configdmrgateway['DMR Network 4']['Options'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 4']['Options'] = '"'.$configdmrgateway['DMR Network 4']['Options'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 5']['Password']) && substr($configdmrgateway['DMR Network 5']['Password'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 5']['Password'] = '"'.$configdmrgateway['DMR Network 5']['Password'].'"'; }
+	    if ( isset($configdmrgateway['DMR Network 5']['Options']) &&  substr($configdmrgateway['DMR Network 5']['Options'], 0, 1) !== '"' ) { $configdmrgateway['DMR Network 5']['Options'] = '"'.$configdmrgateway['DMR Network 5']['Options'].'"'; }
+
+	    // dmrgateway config file wrangling
+	    $dmrgwContent = "";
+            foreach($configdmrgateway as $dmrgwSection=>$dmrgwValues) {
+                // UnBreak special cases
+                $dmrgwSection = str_replace("_", " ", $dmrgwSection);
+                $dmrgwContent .= "[".$dmrgwSection."]\n";
+                // append the values
+                foreach($dmrgwValues as $dmrgwKey=>$dmrgwValue) {
+                        $dmrgwContent .= $dmrgwKey."=".$dmrgwValue."\n";
+                }
+                $dmrgwContent .= "\n";
+            }
+            if (!$handledmrGWconfig = fopen('/tmp/k4jhdd34jeFr8f.tmp', 'w')) {
+                return false;
+            }
+	    if (!is_writable('/tmp/k4jhdd34jeFr8f.tmp')) {
+                echo "<br />\n";
+              echo "<table>\n";
+              echo "<tr><th>ERROR</th></tr>\n";
+              echo "<tr><td>Unable to write configuration file(s)...</td><tr>\n";
+              echo "<tr><td>Please wait a few seconds and retry...</td></tr>\n";
+              echo "</table>\n";
+              unset($_POST);
+              echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
+              die();
+	    }
+	    else {
+	        $success = fwrite($handledmrGWconfig, $dmrgwContent);
+	        fclose($handledmrGWconfig);
+		if (fopen($dmrGatewayConfigFile,'r')) {
+			if (intval(exec('cat /tmp/k4jhdd34jeFr8f.tmp | wc -l')) > 55 ) {
+          			exec('sudo mv /tmp/k4jhdd34jeFr8f.tmp /etc/dmrgateway');	// Move the file back
+          			exec('sudo chmod 644 /etc/dmrgateway');				// Set the correct runtime permissions
+	 			exec('sudo chown root:root /etc/dmrgateway');			// Set the owner
+			}
+	        }
+	    }
+            system('sudo systemctl start cron');
+            system('sudo systemctl restart dmrgateway');
+	    unset($_POST);
+	    echo "<table>\n";
+	    echo "<tr><th>Working...</th></tr>\n";
+	    echo "<tr><td>SystemX Settings Migrated, page reloading...</td></tr>\n";
+	    echo "</table>\n";
+	    echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
+	    echo "<br />\n</div>\n";
+	    echo "<div class=\"footer\">\nPi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-".date("Y").".<br />\n";
+	    echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
+	    echo "<br />\n</div>\n</div>\n</body>\n</html>\n";
+	    die();
+	} // End SysX migration
 
 	// Admin Password Change
 	if (empty($_POST['adminPassword']) != TRUE ) {
@@ -652,7 +823,7 @@ if (!empty($_POST)):
 	  echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
 	  echo "<br />\n</div>\n";
           echo "<div class=\"footer\">\nPi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-".date("Y").".<br />\n";
-		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> enhancements by W0CHP';
+		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
           echo "<br />\n</div>\n</div>\n</body>\n</html>\n";
 	  die();
 	}
@@ -671,13 +842,13 @@ if (!empty($_POST)):
 	  echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
 	  echo "<br />\n</div>\n";
           echo "<div class=\"footer\">\nPi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-".date("Y").".<br />\n";
-		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> enhancements by W0CHP';
+		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
           echo "<br />\n</div>\n</div>\n</body>\n</html>\n";
 	  die();
 	}
 
 	// Stop Cron and all serivices
-	system('sudo REMOUNT_RO="NO" pistar-services fullstop > /dev/null 2>/dev/null');
+	system('sudo pistar-services fullstop > /dev/null 2>/dev/null');
 
 	echo "<table>\n";
 	echo "<tr><th>Working...</th></tr>\n";
@@ -688,15 +859,14 @@ if (!empty($_POST)):
 	if (empty($_POST['factoryReset']) != TRUE ) {
 	  echo "<br />\n";
           echo "<table>\n";
-          echo "<tr><th>Factory Reset Config</th></tr>\n";
-          echo "<tr><td>Loading fresh configuration file(s)...</td><tr>\n";
+          echo "<tr><th>Factory Reset</th></tr>\n";
+          echo "<tr><td>Loading fresh configuration files...</td><tr>\n";
           echo "</table>\n";
           unset($_POST);
 
 	  // Over-write the config files with the clean copies
 	  exec('sudo unzip -o /usr/local/bin/config_clean.zip -d /etc/');
 	  exec('sudo rm -rf /etc/dstar-radio.*');
-	  exec('sudo rm -rf /etc/pistar-css.ini');
 	  exec('sudo git --work-tree=/usr/local/sbin --git-dir=/usr/local/sbin/.git update-index --assume-unchanged pistar-upnp.service');
 	  exec('sudo git --work-tree=/usr/local/sbin --git-dir=/usr/local/sbin/.git reset --hard origin/master');
 	  exec('sudo git --work-tree=/usr/local/bin --git-dir=/usr/local/bin/.git reset --hard origin/master');
@@ -704,7 +874,7 @@ if (!empty($_POST)):
           echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
 	  echo "<br />\n</div>\n";
           echo "<div class=\"footer\">\nPi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-".date("Y").".<br />\n";
-		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> enhancements by W0CHP';
+		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
           echo "<br />\n</div>\n</div>\n</body>\n</html>\n";
 	  die();
 	}
@@ -721,7 +891,7 @@ if (!empty($_POST)):
 	  echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},5000);</script>';
 	  echo "<br />\n</div>\n";
           echo "<div class=\"footer\">\nPi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-".date("Y").".<br />\n";
-		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> enhancements by W0CHP';
+		  echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
           echo "<br />\n</div>\n</div>\n</body>\n</html>\n";
 	  die();
 	}
@@ -911,6 +1081,7 @@ if (!empty($_POST)):
 	if (empty($_POST['selectedAPRSHost']) != TRUE ) {
 	  $rollAPRSHost = 'sudo sed -i "/aprsHostname=/c\\aprsHostname='.escapeshellcmd($_POST['selectedAPRSHost']).'" /etc/ircddbgateway';
 	  system($rollAPRSHost);
+	  $configaprsgateway['APRS-IS']['Server'] = escapeshellcmd($_POST['selectedAPRSHost']);
 	  $configysfgateway['aprs.fi']['Server'] = escapeshellcmd($_POST['selectedAPRSHost']);
 	  $configysf2dmr['aprs.fi']['Server'] = escapeshellcmd($_POST['selectedAPRSHost']);
 	  $configysf2nxdn['aprs.fi']['Server'] = escapeshellcmd($_POST['selectedAPRSHost']);
@@ -1050,7 +1221,6 @@ if (!empty($_POST)):
 	  $configdmrgateway['Info']['TXFrequency'] = $newFREQtx;
 	  $configm17gateway['Info']['RXFrequency'] = $newFREQrx;
 	  $configm17gateway['Info']['TXFrequency'] = $newFREQtx;
-	  // $configm17gateway['General']['Suffix'] = "H";
 	  $configysfgateway['Info']['RXFrequency'] = $newFREQrx;
 	  $configysfgateway['Info']['TXFrequency'] = $newFREQtx;
 	  $configysfgateway['General']['Suffix'] = "Y";
@@ -1159,7 +1329,6 @@ if (!empty($_POST)):
 	  $configdmrgateway['Info']['TXFrequency'] = $newFREQ;
 	  $configm17gateway['Info']['RXFrequency'] = $newFREQ;
 	  $configm17gateway['Info']['TXFrequency'] = $newFREQ;
-	  // $configm17gateway['General']['Suffix'] = "M";
 	  $configysfgateway['Info']['RXFrequency'] = $newFREQ;
 	  $configysfgateway['Info']['TXFrequency'] = $newFREQ;
 	  $configysfgateway['General']['Suffix'] = "Y";
@@ -1249,8 +1418,6 @@ if (!empty($_POST)):
 	// Set Callsign
 	if (empty($_POST['confCallsign']) != TRUE ) {
 	  $newCallsignUpper = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $_POST['confCallsign']));
-	  // Removed the need for the r prefix - OpenQuad have fixed up the servers not to require it.
-	  // if (preg_match("/^[0-9]/", $newCallsignUpper)) { $newCallsignUpperIRC = 'r'.$newCallsignUpper; } else { $newCallsignUpperIRC = $newCallsignUpper; }
 	  $newCallsignUpperIRC = $newCallsignUpper;
 
 	  $rollGATECALL = 'sudo sed -i "/gatewayCallsign=/c\\gatewayCallsign='.$newCallsignUpper.'" /etc/ircddbgateway';
@@ -1266,8 +1433,6 @@ if (!empty($_POST)):
 		  system($rollIRCUSER);
 	  }
 
-	  //if ( strlen($newCallsignUpper) < 6 ) { $configysfgateway['General']['Callsign'] = $newCallsignUpper."-1"; }
-	  //else { $configysfgateway['General']['Callsign'] = $newCallsignUpper; }
 	  $configysfgateway['General']['Callsign'] = $newCallsignUpper;
 	  $configmmdvm['General']['Callsign'] = $newCallsignUpper;
 	  $configysfgateway['aprs.fi']['Password'] = aprspass($newCallsignUpper);
@@ -1415,6 +1580,7 @@ if (!empty($_POST)):
 		$m17SuffixNew = preg_replace('/[^A-Z]/', '', $m17SuffixNew);
 		if (preg_match('/[A-Za-z]/i', $m17SuffixNew)) {
 			$configm17gateway['General']['Suffix'] = $m17SuffixNew;
+			$configm17gateway['APRS']['Suffix'] = $m17SuffixNew;
 		}
 	}
 
@@ -1432,9 +1598,6 @@ if (!empty($_POST)):
 	// Set the YSF Startup Host
 	if (empty($_POST['ysfStartupHost']) != TRUE ) {
 	  $newYSFStartupHostArr = explode(',', escapeshellcmd($_POST['ysfStartupHost']));
-	  //$newYSFStartupHost = strtoupper(escapeshellcmd($_POST['ysfStartupHost']));
-	  //if ($newYSFStartupHost == "NONE") { unset($configysfgateway['Network']['Startup']); }
-	  //else { $configysfgateway['Network']['Startup'] = $newYSFStartupHost; }
 	  if (isset($configysfgateway['FCS Network'])) {
 		if ($newYSFStartupHostArr[0] == "none") {
 			unset($configysfgateway['Network']['Startup']);
@@ -1447,7 +1610,6 @@ if (!empty($_POST)):
 			} else {
 				$configdmr2ysf['DMR Network']['DefaultDstTG'] = "9";
 			}
-			//$configdmr2ysf['DMR Network']['DefaultDstTG'] = str_replace("FCS", "1", $newYSFStartupHostArr[0]);
 		}
 	  } else {
 	  	if ($newYSFStartupHostArr[0] == "none") {
@@ -1461,7 +1623,6 @@ if (!empty($_POST)):
 			} else {
 				$configdmr2ysf['DMR Network']['DefaultDstTG'] = "9";
 			}
-			//$configdmr2ysf['DMR Network']['DefaultDstTG'] = str_replace("FCS", "1", $newYSFStartupHostArr[0]);
 		}
 	  }
 	}
@@ -1492,6 +1653,15 @@ if (!empty($_POST)):
 		    $configdgidgateway['Enabled']['Enabled'] = "0";
 		}
             }
+	}
+
+	// Set the YSFGateway Options for YCS static DG-ID
+	if (empty($_POST['ysfgatewayNetworkOptions']) != TRUE ) {
+		$ysfOptionsLineStripped = str_replace('"', "", $_POST['ysfgatewayNetworkOptions']);
+		$configysfgateway['Network']['Options'] = '"'.$ysfOptionsLineStripped.'"';
+	}
+	else {
+		unset ($configysfgateway['Network']['Options']);
 	}
 
 	// Set the YSF2DMR Master
@@ -1608,10 +1778,16 @@ if (!empty($_POST)):
 	  $configdmrgateway['DMR Network 1']['Id'] = $configmmdvm['General']['Id'].$newPostbmExtendedId;
 	}
 
-	// Set DMR Plus Extended ID
+	// Set DMR+/FreeDMR/HBLink Extended ID
 	if (empty($_POST['dmrPlusExtendedId']) != TRUE ) {
 	  $newPostdmrPlusExtendedId = preg_replace('/[^0-9]/', '', $_POST['dmrPlusExtendedId']);
 	  $configdmrgateway['DMR Network 2']['Id'] = $configmmdvm['General']['Id'].$newPostdmrPlusExtendedId;
+	}
+
+	// Set SystemX Extended ID
+	if (empty($_POST['SystemXExtendedId']) != TRUE ) {
+	  $newPostSystemXExtendedId = preg_replace('/[^0-9]/', '', $_POST['SystemXExtendedId']);
+	  $configdmrgateway['DMR Network 5']['Id'] = $configmmdvm['General']['Id'].$newPostSystemXExtendedId;
 	}
 
 	// Set YSF2DMR ID
@@ -1647,9 +1823,9 @@ if (!empty($_POST)):
 	
 	    if (empty($_POST['tgifHSSecurity']) != TRUE ) {
 		$configModem['TGIF']['Password'] = '"'.$_POST['tgifHSSecurity'].'"';
-		    if ($dmrMasterHostArr[0] != '127.0.0.1') {
-			$configmmdvm['DMR Network']['Password'] = '"'.$_POST['tgifHSSecurity'].'"';
-		    }
+		if ($dmrMasterHostArr[0] != '127.0.0.1') {
+		    $configmmdvm['DMR Network']['Password'] = '"'.$_POST['tgifHSSecurity'].'"';
+		}
 	    } else {
 		unset ($configModem['TGIF']['Password']);
 	    }
@@ -1658,7 +1834,6 @@ if (!empty($_POST)):
 	    if ($dmrMasterHostArr[0] == '127.0.0.1' && $dmrMasterHostArr[2] == '62031') {
 		unset ($configmmdvm['DMR Network']['Options']);
 		unset($configmmdvm['DMR Network']['Type']);
-		//unset ($configdmrgateway['DMR Network 2']['Options']);
 		$configmmdvm['DMR Network']['Local'] = "62032";
 		$configmmdvm['DMR Network']['LocalPort'] = "62032";
 		unset ($configysf2dmr['DMR Network']['Options']);
@@ -1696,8 +1871,8 @@ if (!empty($_POST)):
 		}
 	    }
 
-	    // Set the DMR+ / HBLink / FreeDMR / SystemX (FreeSTAR) Options= line
-	    if ((substr($dmrMasterHostArr[3], 0, 4) == "DMR+") || (substr($dmrMasterHostArr[3], 0, 3) == "HB_") || (substr($dmrMasterHostArr[3], 0, 3) == "FD_") || (substr($dmrMasterHostArr[3], 0, 8) == "FreeDMR_") || (substr($dmrMasterHostArr[3], 0, 8) == "SystemX_")) {
+	    // Set the DMR+ / HBLink / FreeDMR Options= line
+	    if ((substr($dmrMasterHostArr[3], 0, 4) == "DMR+") || (substr($dmrMasterHostArr[3], 0, 3) == "HB_") || (substr($dmrMasterHostArr[3], 0, 3) == "FD_") || (substr($dmrMasterHostArr[3], 0, 8) == "FreeDMR_")) {
 		unset ($configmmdvm['DMR Network']['Local']);
 		unset ($configmmdvm['DMR Network']['LocalPort']);
 		unset ($configysf2dmr['DMR Network']['Local']);
@@ -1714,9 +1889,28 @@ if (!empty($_POST)):
 	    }
 
 	}
+
+        // Set the SystemX (FreeSTAR) Options= line
+        if ((substr($dmrMasterHostArr[3], 0, 8) == "SystemX_")) {
+            unset ($configmmdvm['DMR Network']['Local']);
+            unset ($configmmdvm['DMR Network']['LocalPort']);
+            unset ($configysf2dmr['DMR Network']['Local']);
+            if (empty($_POST['dmrNetworkOptions5']) != TRUE ) {
+                $dmrOptionsLineStripped5 = str_replace('"', "", $_POST['dmrNetworkOptions5']);
+                $configmmdvm['DMR Network']['Options'] = '"'.$dmrOptionsLineStripped5.'"';
+                $configdmrgateway['DMR Network 5']['Options'] = '"'.$dmrOptionsLineStripped5.'"';
+            }
+            else {
+                unset ($configmmdvm['DMR Network']['Options']);
+                unset ($configdmrgateway['DMR Network 5']['Options']);
+                unset ($configysf2dmr['DMR Network']['Options']);
+            }
+        }
+
 	if (empty($_POST['dmrMasterHost']) == TRUE ) {
 	    unset ($configmmdvm['DMR Network']['Options']);
 	    unset ($configdmrgateway['DMR Network 2']['Options']);
+	    unset ($configdmrgateway['DMR Network 5']['Options']);
 	}
 	if (empty($_POST['dmrMasterHost1']) != TRUE ) {
 	    $dmrMasterHostArr1 = explode(',', escapeshellcmd($_POST['dmrMasterHost1']));
@@ -1734,6 +1928,20 @@ if (!empty($_POST)):
 	    $configdmrgateway['DMR Network 2']['Password'] = '"'.$dmrMasterHostArr2[1].'"';
 	    $configdmrgateway['DMR Network 2']['Port'] = $dmrMasterHostArr2[2];
 	    $configdmrgateway['DMR Network 2']['Name'] = $dmrMasterHostArr2[3];
+            $configdmrgateway['DMR Network 2']['TGRewrite0'] = "2,8,2,9,1";
+            $configdmrgateway['DMR Network 2']['PCRewrite0'] = "2,84000,2,4000,1001";
+            $configdmrgateway['DMR Network 2']['PCRewrite1'] = "1,8009990,1,9990,1";
+            $configdmrgateway['DMR Network 2']['PCRewrite2'] = "2,8009990,2,9990,1";
+            $configdmrgateway['DMR Network 2']['PCRewrite3'] = "1,4000001,1,1,999999"; 
+            $configdmrgateway['DMR Network 2']['PCRewrite4'] = "2,4000001,2,1,999999";
+            $configdmrgateway['DMR Network 2']['TypeRewrite1'] = "1,8009990,1,9990";
+            $configdmrgateway['DMR Network 2']['TypeRewrite2'] = "2,8009990,2,9990";
+            $configdmrgateway['DMR Network 2']['TGRewrite1'] = "1,8000001,1,1,999999";
+            $configdmrgateway['DMR Network 2']['TGRewrite2'] = "2,8000001,2,1,999999";
+            $configdmrgateway['DMR Network 2']['SrcRewrite1'] = "1,9990,1,8009990,1";
+            $configdmrgateway['DMR Network 2']['SrcRewrite2'] = "2,9990,2,8009990,1";
+            $configdmrgateway['DMR Network 2']['SrcRewrite3'] = "1,1,1,8000001,999999";
+            $configdmrgateway['DMR Network 2']['SrcRewrite4'] = "2,1,2,8000001,999999";
 	    if (empty($_POST['dmrNetworkOptions']) != TRUE ) {
 		$dmrOptionsLineStripped = str_replace('"', "", $_POST['dmrNetworkOptions']);
 		unset ($configmmdvm['DMR Network']['Options']);
@@ -1743,6 +1951,36 @@ if (!empty($_POST)):
 		unset ($configdmrgateway['DMR Network 2']['Options']);
 	    }
 	}
+	if (empty($_POST['dmrMasterHost5']) != TRUE ) {
+	    $dmrMasterHostArr5 = explode(',', escapeshellcmd($_POST['dmrMasterHost5']));
+	    $configdmrgateway['DMR Network 5']['Address'] = $dmrMasterHostArr5[0];
+	    $configdmrgateway['DMR Network 5']['Password'] = '"'.$dmrMasterHostArr5[1].'"';
+	    $configdmrgateway['DMR Network 5']['Port'] = $dmrMasterHostArr5[2];
+	    $configdmrgateway['DMR Network 5']['Name'] = $dmrMasterHostArr5[3];
+            $configdmrgateway['DMR Network 5']['TGRewrite0'] = "2,4,2,9,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite0'] = "2,44000,2,4000,1001";
+            $configdmrgateway['DMR Network 5']['PCRewrite1'] = "1,4009990,1,9990,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite2'] = "2,4009990,2,9990,1";
+            $configdmrgateway['DMR Network 5']['PCRewrite3'] = "1,4000001,1,1,999999";
+            $configdmrgateway['DMR Network 5']['PCRewrite4'] = "2,4000001,2,1,999999";
+            $configdmrgateway['DMR Network 5']['TypeRewrite1'] = "1,4009990,1,9990";
+            $configdmrgateway['DMR Network 5']['TypeRewrite2'] = "2,4009990,2,9990";
+            $configdmrgateway['DMR Network 5']['TGRewrite1'] = "1,4000001,1,1,999999";
+            $configdmrgateway['DMR Network 5']['TGRewrite2'] = "2,4000001,2,1,999999";
+            $configdmrgateway['DMR Network 5']['SrcRewrite1'] = "1,9990,1,4009990,1";
+            $configdmrgateway['DMR Network 5']['SrcRewrite2'] = "2,9990,2,4009990,1";
+            $configdmrgateway['DMR Network 5']['SrcRewrite3'] = "1,1,1,4000001,999999";
+            $configdmrgateway['DMR Network 5']['SrcRewrite4'] = "2,1,2,4000001,999999";
+	    if (empty($_POST['dmrNetworkOptions5']) != TRUE ) {
+		$dmrOptionsLineStripped5 = str_replace('"', "", $_POST['dmrNetworkOptions5']);
+		unset ($configmmdvm['DMR Network']['Options']);
+		$configdmrgateway['DMR Network 5']['Options'] = '"'.$dmrOptionsLineStripped5.'"';
+	    }
+	    else {
+		unset ($configdmrgateway['DMR Network 5']['Options']);
+	    }
+	}
+
 	if (empty($_POST['dmrMasterHost3']) != TRUE ) {
 	    $dmrMasterHostArr3 = explode(',', escapeshellcmd($_POST['dmrMasterHost3']));
 	    $configdmrgateway['XLX Network 1']['Address'] = $dmrMasterHostArr3[0];
@@ -1805,7 +2043,7 @@ if (!empty($_POST)):
 	  if (escapeshellcmd($_POST['dmrGatewayXlxEn']) == 'OFF' ) { $configdmrgateway['XLX Network 1']['Enabled'] = "0"; $configdmrgateway['XLX Network']['Enabled'] = "0"; }
 	}
 
-	// Set the DMRGateway Network 2 On or Off
+	// Set the DMRGateway Network 2 (DMR+/FreeDMR/HBLink) On or Off
 	if (empty($_POST['dmrGatewayNet2En']) != TRUE ) {
 	  if (escapeshellcmd($_POST['dmrGatewayNet2En']) == 'ON' ) { $configdmrgateway['DMR Network 2']['Enabled'] = "1"; }
 	  if (escapeshellcmd($_POST['dmrGatewayNet2En']) == 'OFF' ) { $configdmrgateway['DMR Network 2']['Enabled'] = "0"; }
@@ -1817,7 +2055,13 @@ if (!empty($_POST)):
 	  if (escapeshellcmd($_POST['dmrGatewayNet4En']) == 'OFF' ) { $configdmrgateway['DMR Network 4']['Enabled'] = "0"; }
 	}
 
-	// Set the DMRGateway Network 1 On or Off
+	// Set the DMRGateway Network 5 (SystemX) On or Off
+	if (empty($_POST['dmrGatewayNet5En']) != TRUE ) {
+	  if (escapeshellcmd($_POST['dmrGatewayNet5En']) == 'ON' ) { $configdmrgateway['DMR Network 5']['Enabled'] = "1"; }
+	  if (escapeshellcmd($_POST['dmrGatewayNet5En']) == 'OFF' ) { $configdmrgateway['DMR Network 5']['Enabled'] = "0"; }
+	}
+
+	// Set the DMRGateway Network 1 (BM) On or Off
 	if (empty($_POST['dmrGatewayNet1En']) != TRUE ) {
 	  if (escapeshellcmd($_POST['dmrGatewayNet1En']) == 'ON' ) { $configdmrgateway['DMR Network 1']['Enabled'] = "1"; }
 	  if (escapeshellcmd($_POST['dmrGatewayNet1En']) == 'OFF' ) { $configdmrgateway['DMR Network 1']['Enabled'] = "0"; }
@@ -2767,11 +3011,11 @@ if (!empty($_POST)):
 		  	}
 	  	  }
 
-/* need dmrgw and dmr2m17 config here */
+		  /* need dmrgw and dmr2m17 config here */
 		  $configdmr2m17['Enabled']['Enabled'] = "1";
 		  unset($configdmrgateway['DMR Network 3']);
 		  $configdmrgateway['DMR Network 3']['Enabled'] = "0";
-		  $configdmrgateway['DMR Network 3']['Name'] = "DMR2NXDN_Cross-over";
+		  $configdmrgateway['DMR Network 3']['Name'] = "DMR2M17_Cross-over";
 		  $configdmrgateway['DMR Network 3']['Id'] = $configdmrgateway['DMR Network 2']['Id'];
 		  $configdmrgateway['DMR Network 3']['Address'] = "127.0.0.1";
 		  $configdmrgateway['DMR Network 3']['Port'] = "62035";
@@ -2824,7 +3068,7 @@ if (!empty($_POST)):
 		$configdmrgateway['DMR Network 4']['SrcRewrite4'] = "2,1,2,5000001,999999";
 	    }
 	    if (escapeshellcmd($_POST['dmrGatewayNet4En']) == 'OFF' )  {
-		unset($configdmrgateway['DMR Network 4']);
+		//unset($configdmrgateway['DMR Network 4']); // not certain why I originally placed this in here. Will disable and hope it doesn't cause issues. ;)
 		$configdmrgateway['DMR Network 4']['Enabled'] = "0";
 	    }
 	}
@@ -2845,34 +3089,57 @@ if (!empty($_POST)):
 	}
 
 	// Set the MMDVMHost Display Type
+	$configmmdvm['NextionDriver']['Enable'] = "0";
+	$configmmdvm['NextionDriver']['Port'] = "0";
+	$configmmdvm['Transparent Data']['Enable'] = "0";
+
 	if  (empty($_POST['mmdvmDisplayType']) != TRUE ) {
-	  if (substr($_POST['mmdvmDisplayType'] , 0, 4 ) === "OLED") {
-		  $configmmdvm['General']['Display'] = "OLED";
-		  $configmmdvm['OLED']['Type'] = substr($_POST['mmdvmDisplayType'] , 4, 1 );
-          if ($configmmdvm['OLED']['Type'] == "6") { $configmmdvm['OLED']['Scroll'] = "0"; }
-	  }
-	  else {
-		  $configmmdvm['General']['Display'] = escapeshellcmd($_POST['mmdvmDisplayType']);
-	  }
+	    if (substr($_POST['mmdvmDisplayType'] , 0, 4 ) === "OLED") {
+		$configmmdvm['General']['Display'] = "OLED";
+		$configmmdvm['OLED']['Type'] = substr($_POST['mmdvmDisplayType'] , 4, 1);
+		if ($configmmdvm['OLED']['Type'] == "6") {
+		    $configmmdvm['OLED']['Scroll'] = "0";
+		}
+	    }
+	    else if (substr($_POST['mmdvmDisplayType'] , 0, 13) === "NextionDriver") {
+		$configmmdvm['General']['Display'] = "Nextion";
+		$configmmdvm['NextionDriver']['Enable'] = "1";
+	    }
+	    else {
+		$configmmdvm['General']['Display'] = escapeshellcmd($_POST['mmdvmDisplayType']);
+	    }
 	}
 
-	// Set the MMDVMHost Display Type
+	// Set the MMDVMHost Display Port
 	if  (empty($_POST['mmdvmDisplayPort']) != TRUE ) {
-	  if (($_POST['mmdvmDisplayPort'] == "None") || ($_POST['mmdvmDisplayPort'] == "modem")) {
-		  $configmmdvm['TFT Serial']['Port'] = $_POST['mmdvmDisplayPort'];
-		  $configmmdvm['Nextion']['Port'] = $_POST['mmdvmDisplayPort'];
-	  } else {
-		  $configmmdvm['TFT Serial']['Port'] = "/dev/".$_POST['mmdvmDisplayPort'];
-		  $configmmdvm['Nextion']['Port'] = "/dev/".$_POST['mmdvmDisplayPort'];
-	  }
+	    if ($_POST['mmdvmDisplayType'] == "NextionDriverTrans") {
+		$configmmdvm['Nextion']['Port'] = "/dev/ttyNextionDriver";
+		$configmmdvm['NextionDriver']['Port'] = "modem";
+		$configmmdvm['Transparent Data']['SendFrameType'] = "1";
+		$configmmdvm['Transparent Data']['Enable'] = "1";
+	    }
+	    else if ($_POST['mmdvmDisplayType'] == "NextionDriver") {
+		$configmmdvm['Nextion']['Port'] = "/dev/ttyNextionDriver";
+		$configmmdvm['NextionDriver']['Port'] = $_POST['mmdvmDisplayPort'];
+	    }
+	    else {
+		if (($_POST['mmdvmDisplayPort'] == "None") || ($_POST['mmdvmDisplayPort'] == "modem")) {
+		    $configmmdvm['TFT Serial']['Port'] = $_POST['mmdvmDisplayPort'];
+		    $configmmdvm['Nextion']['Port'] = $_POST['mmdvmDisplayPort'];
+		}
+		else {
+		    $configmmdvm['TFT Serial']['Port'] = $_POST['mmdvmDisplayPort'];
+		    $configmmdvm['Nextion']['Port'] = $_POST['mmdvmDisplayPort'];
+		}
+	    }
 	}
 
 	// Set the Nextion Display Layout
 	if (empty($_POST['mmdvmNextionDisplayType']) != TRUE ) {
-	  if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "G4KLX") { $configmmdvm['Nextion']['ScreenLayout'] = "0"; }
-	  if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL2") { $configmmdvm['Nextion']['ScreenLayout'] = "2"; }
-	  if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL3") { $configmmdvm['Nextion']['ScreenLayout'] = "3"; }
-	  if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL3HS") { $configmmdvm['Nextion']['ScreenLayout'] = "4"; }
+	    if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "G4KLX") { $configmmdvm['Nextion']['ScreenLayout'] = "0"; }
+	    if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL2") { $configmmdvm['Nextion']['ScreenLayout'] = "2"; }
+	    if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL3") { $configmmdvm['Nextion']['ScreenLayout'] = "3"; }
+	    if (escapeshellcmd($_POST['mmdvmNextionDisplayType']) == "ON7LDSL3HS") { $configmmdvm['Nextion']['ScreenLayout'] = "4"; }
 	}
 
 	// Set MMDVMHost DMR Colour Code
@@ -2985,7 +3252,9 @@ if (!empty($_POST)):
 	if (!isset($configdmrgateway['XLX Network']['UserControl'])) { $configdmrgateway['XLX Network']['UserControl'] = "1"; }
 	if (!isset($configdmrgateway['DMR Network 1']['Location'])) { $configdmrgateway['DMR Network 1']['Location'] = "1"; }
 	if (!isset($configdmrgateway['DMR Network 2']['Location'])) { $configdmrgateway['DMR Network 2']['Location'] = "0"; }
-	if (!isset($configdmrgateway['DMR Network 3']['Location'])) { $configdmrgateway['DMR Network 3']['Location'] = "0"; }
+	if (!isset($configdmrgateway['DMR Network 2']['Debug'])) { $configdmrgateway['DMR Network 2']['Debug'] = "0"; }
+	if (!isset($configdmrgateway['DMR Network 5']['Location'])) { $configdmrgateway['DMR Network 5']['Location'] = "0"; }
+	if (!isset($configdmrgateway['DMR Network 5']['Debug'])) { $configdmrgateway['DMR Network 5']['Debug'] = "0"; }
 	if (isset($configdmrgateway['DMR Network 4'])) {
 		if (!isset($configdmrgateway['DMR Network 4']['Location'])) { $configdmrgateway['DMR Network 4']['Location'] = "0"; }
 	}
@@ -3042,19 +3311,18 @@ if (!empty($_POST)):
 	$configm17gateway['Network']['Revert'] = "1";
 	$configm17gateway['Network']['Debug'] = "0";
 	$configm17gateway['APRS']['Enable'] = $M17GatewayAPRS;
-    $configm17gateway['APRS']['Address'] = "127.0.0.1";
-    $configm17gateway['APRS']['Port'] = "8673";
-    $configm17gateway['APRS']['Description'] = "APRS for M17Gateway";
-    $configm17gateway['APRS']['Suffix'] = "M";
-    $configm17gateway['Remote Commands']['Enable'] = "1";
-    $configm17gateway['Remote Commands']['Port'] = "6076";
-    $configm17gateway['Log']['DisplayLevel'] = "0";
-    $configm17gateway['Log']['FileLevel'] = "2";
-    $configm17gateway['Log']['FilePath'] = "/var/log/pi-star";
-    $configm17gateway['Log']['FileRoot'] = "M17Gateway";
-    $configm17gateway['Voice']['Enabled'] = "1";
-    $configm17gateway['Voice']['Language'] = "en_US";
-    $configm17gateway['Voice']['Directory'] = "/usr/local/etc/M17_Audio";
+	$configm17gateway['APRS']['Address'] = "127.0.0.1";
+	$configm17gateway['APRS']['Port'] = "8673";
+	$configm17gateway['APRS']['Description'] = "APRS for M17Gateway";
+	$configm17gateway['Remote Commands']['Enable'] = "1";
+	$configm17gateway['Remote Commands']['Port'] = "6076";
+	$configm17gateway['Log']['DisplayLevel'] = "0";
+	$configm17gateway['Log']['FileLevel'] = "2";
+	$configm17gateway['Log']['FilePath'] = "/var/log/pi-star";
+	$configm17gateway['Log']['FileRoot'] = "M17Gateway";
+	$configm17gateway['Voice']['Enabled'] = "1";
+	$configm17gateway['Voice']['Language'] = "en_US";
+	$configm17gateway['Voice']['Directory'] = "/usr/local/etc/M17_Audio";
 
 	// Add missing options to MMDVMHost
 	if (!isset($configmmdvm['Modem']['RFLevel'])) { $configmmdvm['Modem']['RFLevel'] = "100"; }
@@ -3127,10 +3395,10 @@ if (!empty($_POST)):
 	if (!isset($configmmdvm['Remote Control']['Port'])) { $configmmdvm['Remote Control']['Port'] = "7642"; }
 	if (!isset($configmmdvm['Remote Control']['Address'])) { $configmmdvm['Remote Control']['Address'] = "127.0.0.1"; }
 	if (isset($configmmdvm['TFT Serial']['Port'])) {
-		if ( $configmmdvm['TFT Serial']['Port'] == "/dev/modem" ) { $configmmdvm['TFT Serial']['Port'] = "modem"; }
+	    if ( $configmmdvm['TFT Serial']['Port'] == "/dev/modem" ) { $configmmdvm['TFT Serial']['Port'] = "modem"; }
 	}
 	if (isset($configmmdvm['Nextion']['Port'])) {
-		if ( $configmmdvm['Nextion']['Port'] == "/dev/modem" ) { $configmmdvm['Nextion']['Port'] = "modem"; }
+	    if ( $configmmdvm['Nextion']['Port'] == "/dev/modem" ) { $configmmdvm['Nextion']['Port'] = "modem"; }
 	}
 	if (!isset($configmmdvm['FM'])) {
 		$configmmdvm['FM']['Enable'] = "0";
@@ -3510,6 +3778,9 @@ if (!empty($_POST)):
 	if (isset($configdmrgateway['DMR Network 2']['Options'])) {
 		ensureOptionsIsQuoted($configdmrgateway['DMR Network 2']['Options']);
 	}
+	if (isset($configdmrgateway['DMR Network 5']['Options'])) {
+		ensureOptionsIsQuoted($configdmrgateway['DMR Network 5']['Options']);
+	}
 	if (isset($configysf2dmr['DMR Network']['Options'])) {
 		ensureOptionsIsQuoted($configysf2dmr['DMR Network']['Options']);
 	}
@@ -3555,6 +3826,7 @@ if (!empty($_POST)):
 			exec('sudo mv /tmp/bW1kdm1ob3N0DQo.tmp /etc/mmdvmhost');		// Move the file back
 			exec('sudo chmod 644 /etc/mmdvmhost');					// Set the correct runtime permissions
 			exec('sudo chown root:root /etc/mmdvmhost');				// Set the owner
+			exec('sudo /usr/local/sbin/nextion-driver-helper');			// Run the Nextion driver helper based on selected MMDVMHost display type
 		}
 	}
 
@@ -4072,7 +4344,7 @@ if (!empty($_POST)):
 
 	// Start all services
 	system('sudo systemctl daemon-reload > /dev/null 2>/dev/null &');	// Restart Systemd to account for any service changes
-	system('sudo REMOUNT_RO="NO" pistar-services start > /dev/null 2>/dev/null &');
+	system('sudo pistar-services start > /dev/null 2>/dev/null &');
 
 	unset($_POST);
 	echo '<script type="text/javascript">setTimeout(function() { window.location=window.location;},7500);</script>';
@@ -4097,6 +4369,7 @@ else:
 		$toggleDmrGatewayNet1EnCheckboxCr	= 'onclick="toggleDmrGatewayNet1EnCheckbox()"';
 		$toggleDmrGatewayNet2EnCheckboxCr	= 'onclick="toggleDmrGatewayNet2EnCheckbox()"';
 		$toggleDmrGatewayNet4EnCheckboxCr	= 'onclick="toggleDmrGatewayNet4EnCheckbox()"';
+		$toggleDmrGatewayNet5EnCheckboxCr	= 'onclick="toggleDmrGatewayNet5EnCheckbox()"';
 		$toggleDmrGatewayXlxEnCheckboxCr	= 'onclick="toggleDmrGatewayXlxEnCheckbox()"';
 		$toggleDmrEmbeddedLCOnlyCr		= 'onclick="toggleDmrEmbeddedLCOnly()"';
 		$toggleDmrDumpTADataCr			= 'onclick="toggleDmrDumpTAData()"';
@@ -4124,6 +4397,7 @@ else:
 		$toggleDmrGatewayNet1EnCheckboxCr	= "";
 		$toggleDmrGatewayNet2EnCheckboxCr	= "";
 		$toggleDmrGatewayNet4EnCheckboxCr	= "";
+		$toggleDmrGatewayNet5EnCheckboxCr	= "";
 		$toggleDmrGatewayXlxEnCheckboxCr	= "";
 		$toggleDmrEmbeddedLCOnlyCr		= "";
 		$toggleDmrDumpTADataCr			= "";
@@ -4135,6 +4409,25 @@ else:
 		$toggleircddbEnabledCr			= "";
 		$toggleDmrBeaconCr			= "";
 	}
+    if ( startsWith($_SESSION['DMRGatewayConfigs']['DMR Network 2']['Name'], "SystemX") ) {
+        echo '<div class="contentwide" style="color:inherit;">'."\n";
+        echo "<h1>Note:</h1>";
+        echo "<h2>You have the DMR SystemX network enabled. The settings for this network have changed. You will need to migrate the settings before proceeding.</h2>"; 
+        echo "<br /><h2>SystemX now has its own configuration section, and uses the \"4\" prefix for talkgroups. Please click the \"Migrate SystemX Settings\" below, to migrate the new SystemX settings...</h2>"; 
+        echo '<br /><form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="post">';
+        echo "<input type='submit' value='Migrate SystemX Settings' name='MigrateSysX'/>";
+        echo "</form><br />";
+        echo '</div>';
+        echo '<div class="footer">';
+        echo 'Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-'.date("Y").'.<br />';
+        echo '<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP';
+        echo '<br />';
+        echo '</div>';
+        echo '</div>';
+        echo '</body>';
+        echo '</html>';
+        die();
+    }
 ?>
 <form id="factoryReset" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
 	<div><input type="hidden" name="factoryReset" value="1" /></div>
@@ -4150,16 +4443,16 @@ else:
     <th colspan="2"><a class="tooltip" href="#"><?php echo $lang['value'];?><span><b>Value</b>The current value from<br />the configuration files</span></a></th>
     </tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['controller_software'];?>:<span><b>Radio Control Software</b>Choose the software used to control the DV Radio Module. Please note that DV Mega hardware will require a firmware upgrade.</span></a></td>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['controller_software'];?>:<span><b>Radio Control Software</b>Choose the software used to control the DV Radio Module.</span></a></td>
     <?php
 	if (file_exists('/etc/dstar-radio.mmdvmhost')) {
-		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" />DStarRepeater <input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" checked=\"checked\" />MMDVMHost (DV-Mega Minimum Firmware 3.07 Required)</td>\n";
+		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" checked=\"checked\" /> MMDVMHost | <input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" /> DStarRepeater</td>\n";
 		}
 	elseif (file_exists('/etc/dstar-radio.dstarrepeater')) {
-		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" checked=\"checked\" />DStarRepeater <input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" />MMDVMHost (DV-Mega Minimum Firmware 3.07 Required)</td>\n";
+		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" /> MMDVMHost | <input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" /> DStarRepeater | </td>\n";
 	}
 	else { // Not set - default to MMDVMHost
-		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" />DStarRepeater <input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" checked=\"checked\" />MMDVMHost (DV-Mega Minimum Firmware 3.07 Required)</td>\n";
+		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"controllerSoft\" value=\"MMDVM\" checked=\"checked\" /> MMDVMHost | <input type=\"radio\" name=\"controllerSoft\" value=\"DSTAR\" onclick=\"alert('After applying your Configuration Settings, you will need to powercycle your Pi.');\" /> DStarRepeater</td>\n";
 	}
     ?>
     </tr>
@@ -4167,17 +4460,16 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['controller_mode'];?>:<span><b>TRX Mode</b>Choose the mode type Simplex node or Duplex repeater.</span></a></td>
     <?php
 	if ($configmmdvm['Info']['RXFrequency'] === $configmmdvm['Info']['TXFrequency']) {
-		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"trxMode\" value=\"SIMPLEX\" checked=\"checked\" />Simplex Node <input type=\"radio\" name=\"trxMode\" value=\"DUPLEX\" />Duplex Repeater (or Half-Duplex on Hotspots)</td>\n";
+		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"trxMode\" value=\"SIMPLEX\" checked=\"checked\" /> Simplex | <input type=\"radio\" name=\"trxMode\" value=\"DUPLEX\" /> Duplex </td>\n";
 		}
 	else {
-		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"trxMode\" value=\"SIMPLEX\" />Simplex Node <input type=\"radio\" name=\"trxMode\" value=\"DUPLEX\" checked=\"checked\" />Duplex Repeater (or Half-Duplex on Hotspots)</td>\n";
+		echo "   <td align=\"left\" colspan=\"2\"><input type=\"radio\" name=\"trxMode\" value=\"SIMPLEX\" /> Simplex | <input type=\"radio\" name=\"trxMode\" value=\"DUPLEX\" checked=\"checked\" /> Duplex</td>\n";
 		}
     ?>
     </tr>
     </table>
-	<div><input type="button" value="<?php echo $lang['apply'];?>" onclick="submitform()" /><br /><br /></div>
-	<h2 class="ConfSec"><?php echo $lang['general_config'];?></h2>
-    <input type="hidden" name="APRSGatewayEnable" value="OFF" />
+    <div><input type="button" value="<?php echo $lang['apply'];?>" onclick="submitform()" /><br /><br /></div>
+    <h2 class="ConfSec"><?php echo $lang['general_config'];?></h2>
     <table>
     <tr>
     <th width="200"><a class="tooltip" href="#"><?php echo $lang['setting'];?><span><b>Setting</b></span></a></th>
@@ -4185,71 +4477,41 @@ else:
     </tr>
     <tr>
     <td align="left"><a class="tooltip2" href="#">Hostname:<span><b>System Hostname</b>This is the system hostname, used for access to the dashboard etc.</span></a></td>
-    <td align="left" colspan="3"><input type="text" name="confHostame" size="13" maxlength="15" value="<?php echo exec('cat /etc/hostname'); ?>" />Do not add suffixes such as .local</td>
+    <td align="left" colspan="3"><input type="text" name="confHostame" size="13" maxlength="15" value="<?php echo exec('cat /etc/hostname'); ?>" /> Do not add suffixes such as ".local"</td>
     </tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['node_call'];?>:<span><b>Gateway Callsign</b>This is your licenced callsign for use on this gateway, do not append the "G"</span></a></td>
-    <td align="left" colspan="3"><input type="text" name="confCallsign" size="13" maxlength="7" value="<?php echo $configs['gatewayCallsign'] ?>" /></td>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['node_call'];?>:<span><b>Gateway Callsign</b>This is your licenced callsign for use on this gateway. Do not append any suffix.</span></a></td>
+    <td align="left" colspan="3"><input type="text" name="confCallsign" size="13" maxlength="7" value="<?php echo $configs['gatewayCallsign'] ?>" /> Do not add suffixes such as "-G"</td>
     </tr>
     <?php if (file_exists('/etc/dstar-radio.mmdvmhost') && (($configmmdvm['DMR']['Enable'] == 1) || ($configmmdvm['P25']['Enable'] == 1 ) || ($configmmdvm['System Fusion']['Enable'] == 1 ))) { ?>
     <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['dmr_id'];?>:<span><b>CCS7/DMR ID</b>Enter your CCS7 / DMR ID here</span></a></td>
-    <td align="left" colspan="3"><input type="text" name="dmrId" size="13" maxlength="9" value="<?php if (isset($configmmdvm['General']['Id'])) { echo $configmmdvm['General']['Id']; } else { echo $configmmdvm['DMR']['Id']; } ?>" /></td>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['dmr_id'];?>:<span><b>DMR/CCS7 ID</b>Enter your DMR / CCS7 ID here</span></a></td>
+    <td align="left" colspan="2"><input type="text" name="dmrId" size="13" maxlength="9" value="<?php if (isset($configmmdvm['General']['Id'])) { echo $configmmdvm['General']['Id']; } else { echo $configmmdvm['DMR']['Id']; } ?>" /></td>
+    <td align="left"><a href="https://radioid.net/account/register" target="_new">(Get a DMR ID from RadioID.Net)</a></td>
     </tr><?php } ?>
     <?php if (file_exists('/etc/dstar-radio.mmdvmhost') && ($configmmdvm['NXDN']['Enable'] == 1)) { ?>
     <tr>
       <td align="left"><a class="tooltip2" href="#">NXDN ID:<span><b>NXDN ID</b>Enter your NXDN ID here</span></a></td>
-      <td align="left" colspan="3"><input type="text" name="nxdnId" size="13" maxlength="5" value="<?php if (isset($configmmdvm['NXDN']['Id'])) { echo $configmmdvm['NXDN']['Id']; } ?>" /></td>
+      <td align="left" colspan="2"><input type="text" name="nxdnId" size="13" maxlength="5" value="<?php if (isset($configmmdvm['NXDN']['Id'])) { echo $configmmdvm['NXDN']['Id']; } ?>" /></td>
+    <td align="left"><a href="https://radioid.net/account/register" target="_new">(Get an NXDN ID from RadioID.Net)</a></td>
     </tr><?php } ?>
 <?php if ($configmmdvm['Info']['TXFrequency'] === $configmmdvm['Info']['RXFrequency']) {
 	echo "    <tr>\n";
-	echo "    <td align=\"left\"><a class=\"tooltip2\" href=\"#\">".$lang['radio_freq'].":<span><b>Radio Frequency</b>This is the Frequency your<br />Pi-Star is on</span></a></td>\n";
-	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQ\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQ\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['RXFrequency'], 0, '.', '.')."\" />MHz</td>\n";
+	echo "    <td align=\"left\"><a class=\"tooltip2\" href=\"#\">".$lang['radio_freq'].":<span><b>Radio Frequency</b>This is the Frequency your<br />hotspot radio is on</span></a></td>\n";
+	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQ\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQ\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['RXFrequency'], 0, '.', '.')."\" /> MHz</td>\n";
 	echo "    </tr>\n";
 	}
 	else {
 	echo "    <tr>\n";
 	echo "    <td align=\"left\"><a class=\"tooltip2\" href=\"#\">".$lang['radio_freq']." RX:<span><b>Radio Frequency</b>This is the Frequency your<br />repeater will listen on</span></a></td>\n";
-	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQrx\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQrx\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['RXFrequency'], 0, '.', '.')."\" />MHz</td>\n";
+	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQrx\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQrx\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['RXFrequency'], 0, '.', '.')."\" /> MHz</td>\n";
 	echo "    </tr>\n";
 	echo "    <tr>\n";
 	echo "    <td align=\"left\"><a class=\"tooltip2\" href=\"#\">".$lang['radio_freq']." TX:<span><b>Radio Frequency</b>This is the Frequency your<br />repeater will transmit on</span></a></td>\n";
-	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQtx\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQtx\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['TXFrequency'], 0, '.', '.')."\" />MHz</td>\n";
+	echo "    <td align=\"left\" colspan=\"3\"><input type=\"text\" id=\"confFREQtx\" onkeyup=\"checkFrequency(); return false;\" name=\"confFREQtx\" size=\"13\" maxlength=\"12\" value=\"".number_format($configmmdvm['Info']['TXFrequency'], 0, '.', '.')."\" /> MHz</td>\n";
 	echo "    </tr>\n";
 	}
 ?>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['lattitude'];?>:<span><b>Gateway Latitude</b>This is the latitude where the gateway is located (positive number for North, negative number for South) - Set to 0 to hide your hotspot location</span></a></td>
-    <td align="left" colspan="3"><input type="text" id="confLatitude" name="confLatitude" size="13" maxlength="9" value="<?php echo $configs['latitude'] ?>" />degrees (positive value for North, negative for South)</td>
-    </tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['longitude'];?>:<span><b>Gateway Longitude</b>This is the longitude where the gateway is located (positive number for East, negative number for West) - Set to 0 to hide your hotspot location</span></a></td>
-    <td align="left" colspan="3"><input type="text" id="confLongitude" name="confLongitude" size="13" maxlength="9" value="<?php echo $configs['longitude'] ?>" />degrees (positive value for East, negative for West)</td>
-    </tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#">GPSd:<span><b>GPS daemon support</b>Read NMEA data from a serially connected GPS unit and then to make that data available for other programs.</span></a></td>
-    <td align="left" colspan="3">
-    <?php
-    // Enabled ??
-    if ($configdmrgateway['GPSD']['Enable'] == "1") { echo "<div class=\"switch\"><input id=\"toggle-GPSD\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"GPSD\" value=\"ON\" checked=\"checked\" /><label for=\"toggle-GPSD\"></label></div>\n"; }
-    else { echo "<div class=\"switch\"><input id=\"toggle-GPSD\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"GPSD\" value=\"ON\" /><label for=\"toggle-GPSD\"></label></div>\n"; } ?>
-    </td>
-    </tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['town'];?>:<span><b>Gateway Town</b>The town where the gateway is located</span></a></td>
-    <td align="left" colspan="3"><input type="text" name="confDesc1" size="30" maxlength="30" value="<?php echo $configs['description1'] ?>" /></td>
-    </tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['country'];?>:<span><b>Gateway Country</b>The country where the gateway is located</span></a></td>
-    <td align="left" colspan="3"><input type="text" name="confDesc2" size="30" maxlength="30" value="<?php echo $configs['description2'] ?>" /></td>
-    </tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['url'];?>:<span><b>Gateway URL</b>The URL used to access this dashboard</span></a></td>
-    <td align="left" colspan="2"><input type="text" name="confURL" size="30" maxlength="30" value="<?php echo $configs['url'] ?>" /></td>
-    <td align="left">
-    <input type="radio" name="urlAuto" value="auto"<?php if (strpos($configs['url'], 'www.qrz.com/db/'.$configmmdvm['General']['Callsign']) !== FALSE) {echo ' checked="checked"';} ?> />Auto
-    <input type="radio" name="urlAuto" value="man"<?php if (strpos($configs['url'], 'www.qrz.com/db/'.$configmmdvm['General']['Callsign']) == FALSE) {echo ' checked="checked"';} ?> />Manual</td>
-    </tr>
 <?php if ( (file_exists('/etc/dstar-radio.dstarrepeater')) || (file_exists('/etc/dstar-radio.mmdvmhost')) ) { ?>
     <tr>
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['radio_type'];?>:<span><b>Radio/Modem</b>What kind of radio or modem hardware do you have?</span></a></td>
@@ -4336,82 +4598,6 @@ else:
 	    <?php } ?>
 	</tr>
 <?php } ?>
-<?php if (file_exists('/etc/aprsgateway')) {
-    echo "<tr id='APRSgw'>\n";
-    echo "<td align=\"left\"><a class=\"tooltip2\" href=\"#\">APRS Gateway Service:<span><b>APRS Gateway Service</b>Enabling this feature will make your location public on the APRS Network.</span></a></td>\n";
-    if ( $configaprsgw['Enabled']['Enabled'] == 1 ) {
-        echo "<td align=\"left\" colspan=\"2\"><div class=\"switch\"><input id=\"toggle-aprsgateway\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"APRSGatewayEnable\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleAPRSGatewayCheckboxCr." /><label id=\"aria-toggle-aprsgateway\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable APRS Position Reporting\" aria-checked=\"true\" onKeyPress=\"toggleAPRSGatewayCheckbox()\" onclick=\"toggleAPRSGatewayCheckbox()\" for=\"toggle-aprsgateway\"><font style=\"font-size:0px\">Enable APRS Position Reporting</font></label></div></td>\n";
-    } else {
-        echo "<td align=\"left\" colspan=\"2\"><div class=\"switch\"><input id=\"toggle-aprsgateway\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"APRSGatewayEnable\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleAPRSGatewayCheckboxCr." /><label id=\"aria-toggle-aprsgateway\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable APRS Position Reporting\" aria-checked=\"false\" onKeyPress=\"toggleAPRSGatewayCheckbox()\" onclick=\"toggleAPRSGatewayCheckbox()\" for=\"toggle-aprsgateway\"><font style=\"font-size:0px\">Enable APRS Position Reporting</font></label></div></td>\n";
-    }
-} ?>
-<td style='word-wrap: break-word;white-space: normal;padding-left: 5px;' align="left">
-<div style="display:block;text-align:left;">
-    <div style="display:block;">
-        <div style="display:block;">
-        <label for="aprsgw-service-selection" style="display: inline-block;">Send APRS Data to Modes:</label>
-            <div style="display: inline-block;vertical-align: middle;">
-                [ <input name="DMRGatewayAPRS" id="aprsgw-service-selection-0" value="DMRGatewayAPRS" type="checkbox"
-				<?php if($DMRGatewayAPRS == '1' && $configmmdvm['DMR Network']['Enable'] == 1) { echo(' checked="checked"'); }
-                      if ($configaprsgw['Enabled']['Enabled'] == 0 || $configmmdvm['DMR Network']['Enable'] == 0)  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-0">DMR</label> |
-            </div>
-            <div style="display: inline-block;vertical-align: middle;">
-                <input name="YSFGatewayAPRS" id="aprsgw-service-selection-1" value="YSFGatewayAPRS" type="checkbox"
-				<?php if(($YSFGatewayAPRS == '1' && $configmmdvm['System Fusion Network']['Enable'] == 1) || ($configaprsgw['Enabled']['Enabled'] == 1 && $configdmr2ysf['Enabled']['Enabled'] == "1")) { echo(' checked="checked"'); }
-					if (($configaprsgw['Enabled']['Enabled'] == 0 && $configmmdvm['System Fusion Network']['Enable'] == 0) || ($configaprsgw['Enabled']['Enabled'] == 0 && $configdmr2ysf['Enabled']['Enabled'] == "0"))  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-1">YSF</label> |
-            </div>
-            <div style="display: inline-block;vertical-align: middle;">
-                <input name="DGIdGatewayAPRS" id="aprsgw-service-selection-2" value="DGIdGatewayAPRS" type="checkbox"
-				<?php if($DGIdGatewayAPRS == '1' && $configaprsgw['Enabled']['Enabled'] == 1) { echo(' checked="checked"'); }
-					if ($configaprsgw['Enabled']['Enabled'] == 0 ||  $configdgidgateway['Enabled']['Enabled'] == "0")  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-2">DGId</label> |
-            </div>
-            <div style="display: inline-block;vertical-align: middle;">
-                <input name="NXDNGatewayAPRS"  id="aprsgw-service-selection-3" value="NXDNGatewayAPRS" type="checkbox"
-				<?php if($NXDNGatewayAPRS == '1' && $configmmdvm['NXDN Network']['Enable'] == 1) { echo(' checked="checked"'); }
-					if ($configaprsgw['Enabled']['Enabled'] == 0 || $configmmdvm['NXDN Network']['Enable'] == 0)  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-3">NXDN</label> |
-            </div>
-            <div style="display: inline-block;vertical-align: middle;">
-                <input name="M17GatewayAPRS" id="aprsgw-service-selection-4" value="M17GatewayAPRS" type="checkbox"
-				<?php if($M17GatewayAPRS == '1' && $configmmdvm['M17 Network']['Enable'] == 1) { echo(' checked="checked"'); }
-					if ($configaprsgw['Enabled']['Enabled'] == 0 || $configmmdvm['M17 Network']['Enable'] == 0)  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-4">M17</label> |
-            </div>
-            <div style="display: inline-block;vertical-align: middle;">
-                <input name="IRCDDBGatewayAPRS" id="aprsgw-service-selection-5" value="IRCDDBGatewayAPRS" type="checkbox"
-				<?php if($IRCDDBGatewayAPRS == '1' && $configs['ircddbEnabled'] == "1" && $configmmdvm['D-Star Network']['Enable'] == 1) { echo(' checked="checked"'); }
-					if ($configaprsgw['Enabled']['Enabled'] == 0 || $configs['ircddbEnabled'] == "0" || $configmmdvm['D-Star Network']['Enable'] == 0)  { echo(' disabled="disabled"'); }?> >
-                <label for="aprsgw-service-selection-5">ircDDB</label> ]
-            </div>
-	    <br /><br /><em>(Note: Both APRS Gateway and the Radio/MMDVM Mode must be enabled in order to be selected.)</em>
-        </div>
-    </div>
-</div>
-</td>
-</tr>
-    <tr>
-    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['aprs_host'];?>:<span><b>APRS Gateway Host Pool</b>Set your preferred APRS host pool here.</span></a></td>
-    <td colspan="3" style="text-align: left;"><select name="selectedAPRSHost">
-<?php 
-    	$aprsHostFile = fopen("/usr/local/etc/APRSHosts.txt", "r");
-        $aprsGatewayConfigFile = '/etc/aprsgateway';
-        if (fopen($aprsGatewayConfigFile,'r')) { $configaprsgateway = parse_ini_file($aprsGatewayConfigFile, true); }
-        $testAPRSHost = $configaprsgateway['APRS-IS']['Server'];
-        while (!feof($aprsHostFile)) {
-                $aprsHostFileLine = fgets($aprsHostFile);
-                $aprsHost = preg_split('/:/', $aprsHostFileLine);
-                if ((strpos($aprsHost[0], ';') === FALSE ) && ($aprsHost[0] != '')) {
-                        if ($testAPRSHost == $aprsHost[0]) { echo "      <option value=\"$aprsHost[0]\" selected=\"selected\">$aprsHost[0]</option>\n"; }
-                        else { echo "      <option value=\"$aprsHost[0]\">$aprsHost[0]</option>\n"; }
-                }
-        }
-        fclose($aprsHostFile);
-        ?>
-    </select></td>
-    </tr>
     <tr>
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['timezone'];?>:<span><b>System TimeZone</b>Set the system timezone</span></a></td>
     <td style="text-align: left;"><select name="systemTimezone" class="systemTimezone">
@@ -4460,7 +4646,127 @@ else:
     <td align="left" style='word-wrap: break-word;white-space: normal;padding-left: 5px;'>Enables / Disables automatic dashboard software update notifications. When enabled, software update availability is displayed in the dashboard header.</td>
     </tr>
     </table>
-	<div><input type="button" value="<?php echo $lang['apply'];?>" onclick="submitform()" /><br /><br /></div>
+
+    <div><input type="button" value="<?php echo $lang['apply'];?>" onclick="submitform()" /><br /><br /></div>
+
+    <h2 class="ConfSec">Location and Hotspot Info Settings</h2>
+    <input type="hidden" name="APRSGatewayEnable" value="OFF" />
+    <table>
+    <tr>
+    <th width="200"><a class="tooltip" href="#"><?php echo $lang['setting'];?><span><b>Setting</b></span></a></th>
+    <th colspan="4"><a class="tooltip" href="#"><?php echo $lang['value'];?><span><b>Value</b>The current value from the<br />configuration files</span></a></th>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['lattitude'];?>:<span><b>Gateway Latitude</b>This is the latitude where the gateway is located (positive number for North, negative number for South) - Set to 0 to hide your hotspot location</span></a></td>
+    <td align="left" colspan="3"><input type="text" id="confLatitude" name="confLatitude" size="13" maxlength="9" value="<?php echo $configs['latitude'] ?>" /> degrees (positive value for North, negative for South)</td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['longitude'];?>:<span><b>Gateway Longitude</b>This is the longitude where the gateway is located (positive number for East, negative number for West) - Set to 0 to hide your hotspot location</span></a></td>
+    <td align="left" colspan="3"><input type="text" id="confLongitude" name="confLongitude" size="13" maxlength="9" value="<?php echo $configs['longitude'] ?>" /> degrees (positive value for East, negative for West)</td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['town'];?>:<span><b>Gateway City/State</b>The City/State where the gateway is located</span></a></td>
+    <td align="left" colspan="3"><input type="text" name="confDesc1" size="30" maxlength="30" value="<?php echo $configs['description1'] ?>" /></td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['country'];?>:<span><b>Gateway Country</b>The country where the gateway is located</span></a></td>
+    <td align="left" colspan="3"><input type="text" name="confDesc2" size="30" maxlength="30" value="<?php echo $configs['description2'] ?>" /></td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#"><?php echo $lang['url'];?>:<span><b>URL</b>Your URL you'd like to be displayed in various networks/gateways</span></a></td>
+    <td align="left" colspan="2"><input type="text" name="confURL" size="30" maxlength="30" value="<?php echo $configs['url'] ?>" /></td>
+    <td align="left">
+    <input type="radio" name="urlAuto" value="auto"<?php if (strpos($configs['url'], 'www.qrz.com/db/'.$configmmdvm['General']['Callsign']) !== FALSE) {echo ' checked="checked"';} ?> />Auto
+    <input type="radio" name="urlAuto" value="man"<?php if (strpos($configs['url'], 'www.qrz.com/db/'.$configmmdvm['General']['Callsign']) == FALSE) {echo ' checked="checked"';} ?> />Manual</td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#">GPSd:<span><b>GPS daemon support</b>Read NMEA data from a serially connected GPS unit and then to make that data available for other programs.</span></a></td>
+    <td align="left" colspan="3">
+    <?php
+    // Enabled ??
+    if ($configdmrgateway['GPSD']['Enable'] == "1") { echo "<div class=\"switch\"><input id=\"toggle-GPSD\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"GPSD\" value=\"ON\" checked=\"checked\" /><label for=\"toggle-GPSD\"></label></div>\n"; }
+    else { echo "<div class=\"switch\"><input id=\"toggle-GPSD\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"GPSD\" value=\"ON\" /><label for=\"toggle-GPSD\"></label></div>\n"; } ?>
+    </td>
+    </tr>
+<?php if (file_exists('/etc/aprsgateway')) {
+    echo "<tr id='APRSgw'>\n";
+    echo "<td align=\"left\"><a class=\"tooltip2\" href=\"#\">APRS Gateway:<span><b>APRS Gateway</b>Enabling this feature will make your location public on the APRS Network.</span></a></td>\n";
+    if ( $configaprsgateway['Enabled']['Enabled'] == 1 ) {
+        echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-aprsgateway\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"APRSGatewayEnable\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleAPRSGatewayCheckboxCr." /><label id=\"aria-toggle-aprsgateway\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable APRS Position Reporting\" aria-checked=\"true\" onKeyPress=\"toggleAPRSGatewayCheckbox()\" onclick=\"toggleAPRSGatewayCheckbox()\" for=\"toggle-aprsgateway\"><font style=\"font-size:0px\">Enable APRS Position Reporting</font></label></div></td>\n";
+    } else {
+        echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-aprsgateway\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"APRSGatewayEnable\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleAPRSGatewayCheckboxCr." /><label id=\"aria-toggle-aprsgateway\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable APRS Position Reporting\" aria-checked=\"false\" onKeyPress=\"toggleAPRSGatewayCheckbox()\" onclick=\"toggleAPRSGatewayCheckbox()\" for=\"toggle-aprsgateway\"><font style=\"font-size:0px\">Enable APRS Position Reporting</font></label></div></td>\n";
+    }
+} ?>
+    <td align="left">APRS Host Pool:</a>
+    <select name="selectedAPRSHost">
+<?php
+        $aprsHostFile = fopen("/usr/local/etc/APRSHosts.txt", "r");
+        $aprsGatewayConfigFile = '/etc/aprsgateway';
+        if (fopen($aprsGatewayConfigFile,'r')) { $configaprsgateway = parse_ini_file($aprsGatewayConfigFile, true); }
+        $testAPRSHost = $configaprsgateway['APRS-IS']['Server'];
+        while (!feof($aprsHostFile)) {
+                $aprsHostFileLine = fgets($aprsHostFile);
+                $aprsHost = preg_split('/:/', $aprsHostFileLine);
+                if ((strpos($aprsHost[0], ';') === FALSE ) && ($aprsHost[0] != '')) {
+                        if ($testAPRSHost == $aprsHost[0]) { echo "      <option value=\"$aprsHost[0]\" selected=\"selected\">$aprsHost[0]</option>\n"; }
+                        else { echo "      <option value=\"$aprsHost[0]\">$aprsHost[0]</option>\n"; }
+                }
+        }
+        fclose($aprsHostFile);
+        ?>
+    </select></td>
+    <td style='word-wrap: break-word;white-space: normal;padding-left: 5px;' align="left">
+      <div style="display:block;text-align:left;">
+        <div style="display:block;">
+          <div style="display:block;">
+          <label for="aprsgw-service-selection" style="display: inline-block;">Publish APRS Data for Mode(s):</label>
+          <br>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="DMRGatewayAPRS" id="aprsgw-service-selection-0" value="DMRGatewayAPRS" type="checkbox"
+                <?php if($DMRGatewayAPRS == '1' && $configmmdvm['DMR Network']['Enable'] == "1") { echo(' checked="checked"'); }
+                if ($configmmdvm['DMR Network']['Enable'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-0">DMR</label>
+            </div>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="YSFGatewayAPRS" id="aprsgw-service-selection-1" value="YSFGatewayAPRS" type="checkbox"
+                <?php if(($YSFGatewayAPRS == "1" && $configmmdvm['System Fusion Network']['Enable'] == "1") || ($YSFGatewayAPRS == "1" && $configdmr2ysf['Enabled']['Enabled'] == "1")) { echo(' checked="checked"'); }
+                if ($configmmdvm['System Fusion Network']['Enable'] !== "1" && $configdmr2ysf['Enabled']['Enabled'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-1">YSF</label>
+            </div>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="DGIdGatewayAPRS" id="aprsgw-service-selection-2" value="DGIdGatewayAPRS" type="checkbox"
+                <?php if($DGIdGatewayAPRS == "1" && $configaprsgateway['Enabled']['Enabled'] == "1") { echo(' checked="checked"'); }
+                if ($configdgidgateway['Enabled']['Enabled'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-2">DGId</label>
+            </div>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="NXDNGatewayAPRS"  id="aprsgw-service-selection-3" value="NXDNGatewayAPRS" type="checkbox"
+                <?php if($NXDNGatewayAPRS == "1" && $configmmdvm['NXDN Network']['Enable'] == "1") { echo(' checked="checked"'); }
+                if ($configmmdvm['NXDN Network']['Enable'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-3">NXDN</label>
+            </div>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="M17GatewayAPRS" id="aprsgw-service-selection-4" value="M17GatewayAPRS" type="checkbox"
+                <?php if($M17GatewayAPRS == "1" && $configmmdvm['M17 Network']['Enable'] == "1") { echo(' checked="checked"'); }
+                if ($configmmdvm['M17 Network']['Enable'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-4">M17</label>
+            </div>
+            <div style="display: inline-block;vertical-align: middle;">
+                <input name="IRCDDBGatewayAPRS" id="aprsgw-service-selection-5" value="IRCDDBGatewayAPRS" type="checkbox"
+                <?php if($IRCDDBGatewayAPRS == "1" && $configs['ircddbEnabled'] == "1" && $configmmdvm['D-Star Network']['Enable'] == "1") { echo(' checked="checked"'); }
+                if ($configs['ircddbEnabled'] !== "1" || $configmmdvm['D-Star Network']['Enable'] !== "1")  { echo(' disabled="disabled"'); }?> >
+                <label for="aprsgw-service-selection-5">ircDDB</label>
+            </div>
+            <br /><em><small>(Note: Radio/MMDVM Mode must be enabled to select APRS mode publishing.)</small></em>
+          </div>
+        </div>
+       </div>
+      </td>
+    </tr>
+    </table>
+
+    <div><input type="button" value="<?php echo $lang['apply'];?>" onclick="submitform()" /><br /><br /></div>
+
 <?php if (file_exists('/etc/dstar-radio.mmdvmhost')) { ?>
     <input type="hidden" name="MMDVMModeDMR" value="OFF" />
     <input type="hidden" name="MMDVMModeDSTAR" value="OFF" />
@@ -4485,10 +4791,10 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['dmr_mode'];?>:<span><b>DMR Mode</b>Turn on DMR Features</span></a></td>
     <?php
 	if ( $configmmdvm['DMR']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMRCheckboxCr." /><label id=\"aria-toggle-dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMRCheckbox()\" onclick=\"toggleDMRCheckbox()\" for=\"toggle-dmr\"><font style=\"font-size:0px\">DMR Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMRCheckboxCr." /><label id=\"aria-toggle-dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMRCheckbox()\" onclick=\"toggleDMRCheckbox()\" for=\"toggle-dmr\"><font style=\"font-size:0px\">DMR Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMRCheckboxCr." /><label id=\"aria-toggle-dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR Mode\" aria-checked=\"false\" onKeyPress=\"toggleDMRCheckbox()\" onclick=\"toggleDMRCheckbox()\" for=\"toggle-dmr\"><font style=\"font-size:0px\">DMR Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMRCheckboxCr." /><label id=\"aria-toggle-dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR Mode\" aria-checked=\"false\" onKeyPress=\"toggleDMRCheckbox()\" onclick=\"toggleDMRCheckbox()\" for=\"toggle-dmr\"><font style=\"font-size:0px\">DMR Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="dmrRfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['DMR']['ModeHang'])) { echo $configmmdvm['DMR']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4499,10 +4805,10 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['d-star_mode'];?>:<span><b>D-Star Mode</b>Turn on D-Star Features</span></a></td>
     <?php
 	if ( $configmmdvm['D-Star']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dstar\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDSTAR\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDSTARCheckboxCr." /><label id=\"aria-toggle-dstar\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DStar Mode\" aria-checked=\"true\" onKeyPress=\"toggleDSTARCheckbox()\" onclick=\"toggleDSTARCheckbox()\" for=\"toggle-dstar\"><font style=\"font-size:0px\">DStar Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dstar\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDSTAR\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDSTARCheckboxCr." /><label id=\"aria-toggle-dstar\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DStar Mode\" aria-checked=\"true\" onKeyPress=\"toggleDSTARCheckbox()\" onclick=\"toggleDSTARCheckbox()\" for=\"toggle-dstar\"><font style=\"font-size:0px\">DStar Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dstar\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDSTAR\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDSTARCheckboxCr." /><label id=\"aria-toggle-dstar\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DStar Mode\" aria-checked=\"false\" onKeyPress=\"toggleDSTARCheckbox()\" onclick=\"toggleDSTARCheckbox()\" for=\"toggle-dstar\"><font style=\"font-size:0px\">DStar Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dstar\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDSTAR\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDSTARCheckboxCr." /><label id=\"aria-toggle-dstar\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DStar Mode\" aria-checked=\"false\" onKeyPress=\"toggleDSTARCheckbox()\" onclick=\"toggleDSTARCheckbox()\" for=\"toggle-dstar\"><font style=\"font-size:0px\">DStar Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="dstarRfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['D-Star']['ModeHang'])) { echo $configmmdvm['D-Star']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4513,10 +4819,10 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['ysf_mode'];?>:<span><b>YSF Mode</b>Turn on YSF Features</span></a></td>
     <?php
 	if ( $configmmdvm['System Fusion']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeFUSION\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSFCheckboxCr." /><label id=\"aria-toggle-ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F Mode\" aria-checked=\"true\" onKeyPress=\"toggleYSFCheckbox()\" onclick=\"toggleYSFCheckbox()\" for=\"toggle-ysf\"><font style=\"font-size:0px\">Y S F Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeFUSION\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSFCheckboxCr." /><label id=\"aria-toggle-ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F Mode\" aria-checked=\"true\" onKeyPress=\"toggleYSFCheckbox()\" onclick=\"toggleYSFCheckbox()\" for=\"toggle-ysf\"><font style=\"font-size:0px\">Y S F Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeFUSION\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSFCheckboxCr." /><label id=\"aria-toggle-ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSFCheckbox()\" onclick=\"toggleYSFCheckbox()\" for=\"toggle-ysf\"><font style=\"font-size:0px\">Y S F Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeFUSION\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSFCheckboxCr." /><label id=\"aria-toggle-ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSFCheckbox()\" onclick=\"toggleYSFCheckbox()\" for=\"toggle-ysf\"><font style=\"font-size:0px\">Y S F Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="ysfRfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['System Fusion']['ModeHang'])) { echo $configmmdvm['System Fusion']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4527,10 +4833,10 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['p25_mode'];?>:<span><b>P25 Mode</b>Turn on P25 Features</span></a></td>
     <?php
 	if ( $configmmdvm['P25']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeP25\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleP25CheckboxCr." /><label id=\"aria-toggle-p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"P 25 Mode\" aria-checked=\"true\" onKeyPress=\"toggleP25Checkbox()\" onclick=\"toggleP25Checkbox()\" for=\"toggle-p25\"><font style=\"font-size:0px\">P 25 Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeP25\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleP25CheckboxCr." /><label id=\"aria-toggle-p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"P 25 Mode\" aria-checked=\"true\" onKeyPress=\"toggleP25Checkbox()\" onclick=\"toggleP25Checkbox()\" for=\"toggle-p25\"><font style=\"font-size:0px\">P 25 Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeP25\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleP25CheckboxCr." /><label id=\"aria-toggle-p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"P 25 Mode\" aria-checked=\"false\" onKeyPress=\"toggleP25Checkbox()\" onclick=\"toggleP25Checkbox()\" for=\"toggle-p25\"><font style=\"font-size:0px\">P 25 Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeP25\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleP25CheckboxCr." /><label id=\"aria-toggle-p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"P 25 Mode\" aria-checked=\"false\" onKeyPress=\"toggleP25Checkbox()\" onclick=\"toggleP25Checkbox()\" for=\"toggle-p25\"><font style=\"font-size:0px\">P 25 Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="p25RfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['P25']['ModeHang'])) { echo $configmmdvm['P25']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4541,10 +4847,10 @@ else:
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['nxdn_mode'];?>:<span><b>NXDN Mode</b>Turn on NXDN Features</span></a></td>
     <?php
 	if ( $configmmdvm['NXDN']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeNXDN\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleNXDNCheckboxCr." /><label id=\"aria-toggle-nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleNXDNCheckbox()\" onclick=\"toggleNXDNCheckbox()\" for=\"toggle-nxdn\"><font style=\"font-size:0px\">NXDN Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeNXDN\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleNXDNCheckboxCr." /><label id=\"aria-toggle-nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleNXDNCheckbox()\" onclick=\"toggleNXDNCheckbox()\" for=\"toggle-nxdn\"><font style=\"font-size:0px\">NXDN Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeNXDN\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleNXDNCheckboxCr." /><label id=\"aria-toggle-nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"NXDN Mode\" aria-checked=\"false\" onKeyPress=\"toggleNXDNCheckbox()\" onclick=\"toggleNXDNCheckbox()\" for=\"toggle-nxdn\"><font style=\"font-size:0px\">NXDN Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeNXDN\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleNXDNCheckboxCr." /><label id=\"aria-toggle-nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"NXDN Mode\" aria-checked=\"false\" onKeyPress=\"toggleNXDNCheckbox()\" onclick=\"toggleNXDNCheckbox()\" for=\"toggle-nxdn\"><font style=\"font-size:0px\">NXDN Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="nxdnRfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['NXDN']['ModeHang'])) { echo $configmmdvm['NXDN']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4556,10 +4862,10 @@ else:
     <td align="left"><a class="tooltip2" href="#">M17 Mode:<span><b>M17 Mode</b>Turn on M17 Features</span></a></td>
     <?php
 	if ( $configmmdvm['M17']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-m17\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeM17\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleM17CheckboxCr." /><label id=\"aria-toggle-m17\" role=\"checkbox\" tabindex=\"0\" aria-label=\"M17 Mode\" aria-checked=\"true\" onKeyPress=\"toggleM17Checkbox()\" onclick=\"toggleM17Checkbox()\" for=\"toggle-m17\"><font style=\"font-size:0px\">M17 Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-m17\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeM17\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleM17CheckboxCr." /><label id=\"aria-toggle-m17\" role=\"checkbox\" tabindex=\"0\" aria-label=\"M17 Mode\" aria-checked=\"true\" onKeyPress=\"toggleM17Checkbox()\" onclick=\"toggleM17Checkbox()\" for=\"toggle-m17\"><font style=\"font-size:0px\">M17 Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-m17\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeM17\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleM17CheckboxCr." /><label id=\"aria-toggle-m17\" role=\"checkbox\" tabindex=\"0\" aria-label=\"M17 Mode\" aria-checked=\"false\" onKeyPress=\"toggleM17Checkbox()\" onclick=\"toggleM17Checkbox()\" for=\"toggle-m17\"><font style=\"font-size:0px\">M17 Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-m17\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeM17\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleM17CheckboxCr." /><label id=\"aria-toggle-m17\" role=\"checkbox\" tabindex=\"0\" aria-label=\"M17 Mode\" aria-checked=\"false\" onKeyPress=\"toggleM17Checkbox()\" onclick=\"toggleM17Checkbox()\" for=\"toggle-m17\"><font style=\"font-size:0px\">M17 Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">RF Hangtime: <input type="text" name="m17RfHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['M17']['ModeHang'])) { echo $configmmdvm['M17']['ModeHang']; } else { echo "20"; } ?>" />
@@ -4573,6 +4879,10 @@ else:
 	if ($configdgidgateway['Enabled']['Enabled'] == 1) {
 	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2DMR\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2DMRCheckboxCr." disabled=\"disabled\"/><label id=\"aria-toggle-ysf2dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 DMR Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2DMRCheckbox()\" onclick=\"toggleYSF2DMRCheckbox()\" for=\"toggle-ysf2dmr\"><font style=\"font-size:0px\">Y S F 2 DMR Mode</font></label></div></td>\n";
 	    echo "<td align='left'><em>Note: YSF2DMR cannot be enabled along with DGIdGateway</em></td>\n";
+	} else if
+	    ($configmmdvm['System Fusion']['Enable'] != 1) {
+	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2DMR\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2DMRCheckboxCr." disabled=\"disabled\"/><label id=\"aria-toggle-ysf2dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 DMR Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2DMRCheckbox()\" onclick=\"toggleYSF2DMRCheckbox()\" for=\"toggle-ysf2dmr\"><font style=\"font-size:0px\">Y S F 2 DMR Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: YSF Mode must be enabled first.</em></td>\n";
 	} else {
 	    if ( $configysf2dmr['Enabled']['Enabled'] == 1 ) {
 		echo "<td colspan=\"2\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2dmr\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2DMR\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2DMRCheckboxCr." /><label id=\"aria-toggle-ysf2dmr\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 DMR Mode\" aria-checked=\"true\" onKeyPress=\"toggleYSF2DMRCheckbox()\" onclick=\"toggleYSF2DMRCheckbox()\" for=\"toggle-ysf2dmr\"><font style=\"font-size:0px\">Y S F 2 DMR Mode</font></label></div></td>\n";
@@ -4589,6 +4899,10 @@ else:
 	if ($configdgidgateway['Enabled']['Enabled'] == 1) {
 	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2NXDN\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2NXDNCheckboxCr." disabled=\"disabled\" /><label id=\"aria-toggle-ysf2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 NXDN Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2NXDNCheckbox()\" onclick=\"toggleYSF2NXDNCheckbox()\" for=\"toggle-ysf2nxdn\"><font style=\"font-size:0px\">Y S F 2 NXDN Mode</font></label></div></td>\n";
 	    echo "<td align='left'><em>Note: YSF2NXDN cannot be enabled along with DGIdGateway</em></td>\n";
+	} else if
+	    ($configmmdvm['System Fusion']['Enable'] != 1) {
+	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2NXDN\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2NXDNCheckboxCr." disabled=\"disabled\" /><label id=\"aria-toggle-ysf2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 NXDN Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2NXDNCheckbox()\" onclick=\"toggleYSF2NXDNCheckbox()\" for=\"toggle-ysf2nxdn\"><font style=\"font-size:0px\">Y S F 2 NXDN Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: YSF Mode must be enabled first.</em></td>\n";
 	} else {
 	    if ( $configysf2nxdn['Enabled']['Enabled'] == 1 ) {
 		echo "<td colspan=\"2\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2NXDN\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2NXDNCheckboxCr." /><label id=\"aria-toggle-ysf2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleYSF2NXDNCheckbox()\" onclick=\"toggleYSF2NXDNCheckbox()\" for=\"toggle-ysf2nxdn\"><font style=\"font-size:0px\">Y S F 2 NXDN Mode</font></label></div></td>\n";
@@ -4606,6 +4920,10 @@ else:
 	if ($configdgidgateway['Enabled']['Enabled'] == 1) {
 	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2P25\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2P25CheckboxCr." disabled=\"disabled\"/><label id=\"aria-toggle-ysf2p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 P 25 Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2P25Checkbox()\" onclick=\"toggleYSF2P25Checkbox()\" for=\"toggle-ysf2p25\"><font style=\"font-size:0px\">Y S F 2 P 25 Mode</font></label></div></td>\n";
 	    echo "<td align='left'><em>Note: YSF2P25 cannot be enabled along with DGIdGateway</em></td>\n";
+        } else if
+            ($configmmdvm['System Fusion']['Enable'] != 1) {
+	    echo "<td colspan=\"1\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2P25\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2P25CheckboxCr." disabled=\"disabled\"/><label id=\"aria-toggle-ysf2p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 P 25 Mode\" aria-checked=\"false\" onKeyPress=\"toggleYSF2P25Checkbox()\" onclick=\"toggleYSF2P25Checkbox()\" for=\"toggle-ysf2p25\"><font style=\"font-size:0px\">Y S F 2 P 25 Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: YSF Mode must be enabled first.</em></td>\n";
 	} else {
 	    if ( $configysf2p25['Enabled']['Enabled'] == 1 ) {
 		echo "<td colspan=\"2\" align=\"left\"><div class=\"switch\"><input id=\"toggle-ysf2p25\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeYSF2P25\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleYSF2P25CheckboxCr." /><label id=\"aria-toggle-ysf2p25\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Y S F 2 P 25 Mode\" aria-checked=\"true\" onKeyPress=\"toggleYSF2P25Checkbox()\" onclick=\"toggleYSF2P25Checkbox()\" for=\"toggle-ysf2p25\"><font style=\"font-size:0px\">Y S F 2 P 25 Mode</font></label></div></td>\n";
@@ -4620,28 +4938,46 @@ else:
     <tr>
     <td align="left"><a class="tooltip2" href="#">DMR2YSF:<span><b>DMR2YSF Mode</b>Turn on DMR2YSF Features</span></a></td>
     <?php
-	if ( $configdmr2ysf['Enabled']['Enabled'] == 1 ) {
+	if ($configmmdvm['DMR']['Enable'] != 1) {
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2YSF\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2YSFCheckboxCr." disabled='disabled' /><label id=\"aria-toggle-dmr2ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 Y S F Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2YSFCheckbox()\" onclick=\"toggleDMR2YSFCheckbox()\" for=\"toggle-dmr2ysf\"><font style=\"font-size:0px\">DMR 2 Y S F Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: DMR Mode must be enabled first.</em></td>\n";
+	} else if ( $configdmr2nxdn['Enabled']['Enabled'] == 1 ) {
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2YSF\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2YSFCheckboxCr." disabled='disabled' /><label id=\"aria-toggle-dmr2ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 Y S F Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2YSFCheckbox()\" onclick=\"toggleDMR2YSFCheckbox()\" for=\"toggle-dmr2ysf\"><font style=\"font-size:0px\">DMR 2 Y S F Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: Cannot be enabed when DMR2NXDN is enabled.</em></td>\n";
+	} else {
+	    if ( $configdmr2ysf['Enabled']['Enabled'] == 1 ) {
 		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2YSF\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2YSFCheckboxCr." /><label id=\"aria-toggle-dmr2ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 Y S F Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2YSFCheckbox()\" onclick=\"toggleDMR2YSFCheckbox()\" for=\"toggle-dmr2ysf\"><font style=\"font-size:0px\">DMR 2 Y S F Mode</font></label></div></td>\n";
-		}
-	else {
+		echo '<td align="left" style="word-wrap: break-word;white-space: normal">Uses "7" talkgroup prefix on DMRGateway. Cannot be enabled with DMR2NXDN.</td>';
+	    }
+	    else {
 		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2ysf\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2YSF\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2YSFCheckboxCr." /><label id=\"aria-toggle-dmr2ysf\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 Y S F Mode\" aria-checked=\"false\" onKeyPress=\"toggleDMR2YSFCheckbox()\" onclick=\"toggleDMR2YSFCheckbox()\" for=\"toggle-dmr2ysf\"><font style=\"font-size:0px\">DMR 2 Y S F Mode</font></label></div></td>\n";
+		echo '<td align="left" style="word-wrap: break-word;white-space: normal">Uses "7" talkgroup prefix on DMRGateway. Cannot be enabled with DMR2NXDN.</td>';
+	    }
 	}
     ?>
-    <td align="left">Uses 7 prefix on DMRGateway</td>
     </tr>
     <?php } ?>
     <?php if (file_exists('/etc/dmr2nxdn')) { ?>
     <tr>
     <td align="left"><a class="tooltip2" href="#">DMR2NXDN:<span><b>DMR2NXDN Mode</b>Turn on DMR2NXDN Features</span></a></td>
     <?php
-	if ( $configdmr2nxdn['Enabled']['Enabled'] == 1 ) {
+	if ($configmmdvm['DMR']['Enable'] != 1) {
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2NXDN\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2NXDNCheckboxCr." disabled='disabled'/><label id=\"aria-toggle-dmr2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2NXDNCheckbox()\" onclick=\"toggleDMR2NXDNCheckbox()\" for=\"toggle-dmr2nxdn\"><font style=\"font-size:0px\">DMR 2 NXDN Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: DMR Mode must be enabled first.</em></td>\n";
+	} else if ( $configdmr2ysf['Enabled']['Enabled'] == 1 ) {
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2NXDN\" value=\"OFF\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2NXDNCheckboxCr." disabled='disabled'/><label id=\"aria-toggle-dmr2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2NXDNCheckbox()\" onclick=\"toggleDMR2NXDNCheckbox()\" for=\"toggle-dmr2nxdn\"><font style=\"font-size:0px\">DMR 2 NXDN Mode</font></label></div></td>\n";
+	    echo "<td align='left'><em>Note: Cannot be enabed when DMR2YSF is enabled.</em></td>\n";
+	} else {
+	    if ( $configdmr2nxdn['Enabled']['Enabled'] == 1 ) {
 		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2NXDN\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2NXDNCheckboxCr." /><label id=\"aria-toggle-dmr2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 NXDN Mode\" aria-checked=\"true\" onKeyPress=\"toggleDMR2NXDNCheckbox()\" onclick=\"toggleDMR2NXDNCheckbox()\" for=\"toggle-dmr2nxdn\"><font style=\"font-size:0px\">DMR 2 NXDN Mode</font></label></div></td>\n";
-		}
-	else {
+		echo '<td align="left" style="word-wrap: break-word;white-space: normal">Uses "7" talkgroup prefix on DMRGateway. Cannot be enabled with DMR2YSF.</td>';
+	    }
+	    else {
 		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-dmr2nxdn\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModeDMR2NXDN\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDMR2NXDNCheckboxCr." /><label id=\"aria-toggle-dmr2nxdn\" role=\"checkbox\" tabindex=\"0\" aria-label=\"DMR 2 NXDN Mode\" aria-checked=\"false\" onKeyPress=\"toggleDMR2NXDNCheckbox()\" onclick=\"toggleDMR2NXDNCheckbox()\" for=\"toggle-dmr2nxdn\"><font style=\"font-size:0px\">DMR 2 NXDN Mode</font></label></div></td>\n";
+		echo '<td align="left" style="word-wrap: break-word;white-space: normal">Uses "7" talkgroup prefix on DMRGateway. Cannot be enabled with DMR2YSF.</td>';
+	    }
 	}
     ?>
-    <td align="left">Uses 7 prefix on DMRGateway</td>
     </tr>
     <?php } ?>
     <?php if (file_exists('/etc/dapnetgateway')) { ?>
@@ -4649,10 +4985,10 @@ else:
     <td align="left"><a class="tooltip2" href="#">POCSAG:<span><b>POCSAG Mode</b>Turn on POCSAG Features</span></a></td>
     <?php
 	if ( $configmmdvm['POCSAG']['Enable'] == 1 ) {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-pocsag\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModePOCSAG\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$togglePOCSAGCheckboxCr." /><label id=\"aria-toggle-pocsag\" role=\"checkbox\" tabindex=\"0\" aria-label=\"POCSAG Mode\" aria-checked=\"true\" onKeyPress=\"togglePOCSAGCheckbox()\" onclick=\"togglePOCSAGCheckbox()\" for=\"toggle-pocsag\"><font style=\"font-size:0px\">POCSAG Mode</font></label></div></td>\n";
-		}
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-pocsag\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModePOCSAG\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$togglePOCSAGCheckboxCr." /><label id=\"aria-toggle-pocsag\" role=\"checkbox\" tabindex=\"0\" aria-label=\"POCSAG Mode\" aria-checked=\"true\" onKeyPress=\"togglePOCSAGCheckbox()\" onclick=\"togglePOCSAGCheckbox()\" for=\"toggle-pocsag\"><font style=\"font-size:0px\">POCSAG Mode</font></label></div></td>\n";
+	}
 	else {
-		echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-pocsag\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModePOCSAG\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$togglePOCSAGCheckboxCr." /><label id=\"aria-toggle-pocsag\" role=\"checkbox\" tabindex=\"0\" aria-label=\"POCSAG Mode\" aria-checked=\"false\" onKeyPress=\"togglePOCSAGCheckbox()\" onclick=\"togglePOCSAGCheckbox()\" for=\"toggle-pocsag\"><font style=\"font-size:0px\">POCSAG Mode</font></label></div></td>\n";
+	    echo "<td align=\"left\"><div class=\"switch\"><input id=\"toggle-pocsag\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"MMDVMModePOCSAG\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$togglePOCSAGCheckboxCr." /><label id=\"aria-toggle-pocsag\" role=\"checkbox\" tabindex=\"0\" aria-label=\"POCSAG Mode\" aria-checked=\"false\" onKeyPress=\"togglePOCSAGCheckbox()\" onclick=\"togglePOCSAGCheckbox()\" for=\"toggle-pocsag\"><font style=\"font-size:0px\">POCSAG Mode</font></label></div></td>\n";
 	}
     ?>
     <td align="left">POCSAG Mode Hangtime: <input type="text" name="POCSAGHangTime" size="7" maxlength="3" value="<?php if (isset($configmmdvm['POCSAG Network']['ModeHang'])) { echo $configmmdvm['POCSAG Network']['ModeHang']; } else { echo "5"; } ?>"></td>
@@ -4665,6 +5001,8 @@ else:
 	    <option <?php if (($configmmdvm['General']['Display'] == "OLED") && ($configmmdvm['OLED']['Type'] == "3")) {echo 'selected="selected" ';}; ?>value="OLED3">OLED Type 3</option>
 	    <option <?php if (($configmmdvm['General']['Display'] == "OLED") && ($configmmdvm['OLED']['Type'] == "6")) {echo 'selected="selected" ';}; ?>value="OLED6">OLED Type 6</option>
 	    <option <?php if ($configmmdvm['General']['Display'] == "Nextion") {echo 'selected="selected" ';}; ?>value="Nextion">Nextion</option>
+	    <option <?php if ($configmmdvm['General']['Display'] == "NextionDriver") {echo 'selected="selected" ';}; ?>value="NextionDriver">Nextion (enhanced w/driver)</option>
+	    <option <?php if ($configmmdvm['General']['Display'] == "NextionDriverTrans") {echo 'selected="selected" ';}; ?>value="NextionDriverTrans">Nextion (enhanced w/driver, attached to modem)</option>
 	    <option <?php if ($configmmdvm['General']['Display'] == "HD44780") {echo 'selected="selected" ';}; ?>value="HD44780">HD44780</option>
 	    <option <?php if ($configmmdvm['General']['Display'] == "TFT Serial") {echo 'selected="selected" ';}; ?>value="TFT Serial">TFT Serial</option>
 	    <option <?php if ($configmmdvm['General']['Display'] == "LCDproc") {echo 'selected="selected" ';}; ?>value="LCDproc">LCDproc</option>
@@ -4676,27 +5014,35 @@ else:
             } else {
                 echo '      <option value="None">None</option>'."\n";
             }
-            if (isset($configmmdvm['Nextion']['Port'])) {
-                if ($configmmdvm['Nextion']['Port'] == "modem") {
-                        echo '      <option selected="selected" value="modem">modem</option>'."\n";
-                } else {
-                        echo '      <option value="modem">modem</option>'."\n";
-                }
-                if ( ($configmmdvm['Nextion']['Port'] == "None") || ($configmmdvm['Nextion']['Port'] == "" )) { } else {
-			$currentPort = str_replace($configmmdvm['Nextion']['Port'], "/dev/", "");
-                        echo '      <option selected="selected" value="'.$currentPort.'">'.$configmmdvm['Nextion']['Port'].'</option>'."\n";
-                }
-            }
+
+	    if (isset($configmmdvm['Nextion']['Port'])) {
+		if ($configmmdvm['Nextion']['Port'] == "modem") {
+		    echo '      <option selected="selected" value="modem">modem</option>'."\n";
+		}
+		else {
+		    echo '      <option value="modem">modem</option>'."\n";
+		}
+
+		if ( ($configmmdvm['Nextion']['Port'] == "None") || ($configmmdvm['Nextion']['Port'] == "0") || ($configmmdvm['Nextion']['Port'] == "")) {
+		    echo '      <option selected="selected" value="None">None</option>'."\n";
+		}
+		else {
+		    if ($configmmdvm['NextionDriver']['Enable'] == "1") {
+			echo '      <option selected="selected" value="'.$configmmdvm['NextionDriver']['Port'].'">'.$configmmdvm['NextionDriver']['Port'].'</option>'."\n";
+		    }
+		    else {
+			echo '      <option selected="selected" value="'.$configmmdvm['Nextion']['Port'].'">'.$configmmdvm['Nextion']['Port'].'</option>'."\n";
+		    }
+		}
+	    }
+
             exec('ls /dev/ | egrep -h "ttyA|ttyUSB"', $availablePorts);
             foreach($availablePorts as $port) {
                  echo "     <option value=\"$port\">/dev/$port</option>\n";
             }
 	    ?>
 	    <?php if (file_exists('/dev/ttyS2')) { ?>
-	    <option <?php if ($configmmdvm['Nextion']['Port'] == "/dev/ttyS2") {echo 'selected="selected" ';}; ?>value="ttyS2">/dev/ttyS2</option>
-    	    <?php } ?>
-	    <?php if (file_exists('/dev/ttyNextionDriver')) { ?>
-	    <option <?php if ($configmmdvm['Nextion']['Port'] == "/dev/ttyNextionDriver") {echo 'selected="selected" ';}; ?>value="ttyNextionDriver">/dev/ttyNextionDriver</option>
+	    	<option <?php if ($configmmdvm['Nextion']['Port'] == "/dev/ttyS2") {echo 'selected="selected" ';}; ?>value="ttyS2">/dev/ttyS2</option>
     	    <?php } ?>
 	    </select>
 	    Nextion Layout: <select name="mmdvmNextionDisplayType">
@@ -4720,6 +5066,7 @@ else:
     <input type="hidden" name="dmrGatewayNet1En" value="OFF" />
     <input type="hidden" name="dmrGatewayNet2En" value="OFF" />
     <input type="hidden" name="dmrGatewayNet4En" value="OFF" />
+    <input type="hidden" name="dmrGatewayNet5En" value="OFF" />
     <input type="hidden" name="dmrDMRnetJitterBufer" value="OFF" />
     <table>
     <tr>
@@ -4741,8 +5088,8 @@ while (!feof($dmrMasterFile)) {
     $dmrMasterHost = preg_split('/\s+/', $dmrMasterLine);
     if ((strpos($dmrMasterHost[0], '#') === FALSE ) &&
 	((substr($dmrMasterHost[0], 0, 10) == "DMRGateway") ||
-	 (substr($dmrMasterHost[0], 0, 8) == "DMR2NXDN") ||
-	 (substr($dmrMasterHost[0], 0, 7) == "DMR2YSF")) && ($dmrMasterHost[0] != '')) {
+	(substr($dmrMasterHost[0], 0, 8) == "DMR2NXDN") ||
+	(substr($dmrMasterHost[0], 0, 7) == "DMR2YSF")) && ($dmrMasterHost[0] != '')) {
 	if (($testMMDVMdmrMaster == $dmrMasterHost[2]) && ($testMMDVMdmrMasterPort == $dmrMasterHost[4])) {
 	    echo "      <option value=\"$dmrMasterHost[2],$dmrMasterHost[3],$dmrMasterHost[4],$dmrMasterHost[0]\" selected=\"selected\">$dmrMasterHost[0]</option>\n"; $dmrMasterNow = $dmrMasterHost[0]; }
 	else {
@@ -4829,15 +5176,25 @@ fclose($dmrMasterFile);
     <tr>
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['bm_network'];?>:<span><b>BrandMeister Dashboards</b>Direct links to your BrandMeister Dashboards</span></a></td>
     <td colspan="3" align="left">
-    <a href="https://brandmeister.network/?page=device&amp;id=<?php if (isset($configdmrgateway['DMR Network 1']['Id'])) { echo $configdmrgateway['DMR Network 1']['Id']; } else { echo $configmmdvm['General']['Id']; } ?>" target="_new">Repeater Information</a> |
-    <a href="https://brandmeister.network/?page=device-edit&amp;id=<?php if (isset($configdmrgateway['DMR Network 1']['Id'])) { echo $configdmrgateway['DMR Network 1']['Id']; } else { echo $configmmdvm['General']['Id']; } ?>" target="_new">Edit Repeater (BrandMeister Selfcare)</a>
+    <a href="https://brandmeister.network/?page=device&amp;id=<?php if (isset($configdmrgateway['DMR Network 1']['Id'])) { echo $configdmrgateway['DMR Network 1']['Id']; } else { echo $configmmdvm['General']['Id']; } ?>" target="_new">Hotspot/Repeater Information</a> |
+    <a href="https://brandmeister.network/?page=device-edit&amp;id=<?php if (isset($configdmrgateway['DMR Network 1']['Id'])) { echo $configdmrgateway['DMR Network 1']['Id']; } else { echo $configmmdvm['General']['Id']; } ?>" target="_new">Edit Hotspot/Repeater (BrandMeister Selfcare)</a>
     </td>
     </tr>
+<?php
+$bmAPIkeyFile = '/etc/bmapi.key';
+if (!file_exists($bmAPIkeyFile) && !fopen($bmAPIkeyFile,'r')) {
+?>
     <tr>
-    <th align="left" colspan="4">DMR+ / FreeDMR / HBlink / SystemX Network Settings</th>
+    <td align="left"><a href="#" class="tooltip2">Brandmeister Manager:<span><b>Brandmeister Manager</b>BrandMeister Manager API Info</span></a></td>
+    <td align="left" colspan="3" style='word-wrap: break-word;white-space: normal;padding-left: 5px;'>
+       To use the BrandMeister Manager, you need a <a href="https://brandmeister.network/?page=profile-api" target="_new">BM API Key</a>, and then you need to enter it in the <a href="/admin/advanced/fulledit_bmapikey.php">BM API Key Editor</a>.
+    </td>
+    <tr>
+<?php } ?>
+    <th align="left" colspan="4">DMR+ / FreeDMR / HBlink Network Settings</th>
     </tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#">DMR+ / FreeDMR / HBlink / SystemX Master:<span><b>DMR+ / FreeDMR / HBlink / SystemX  Master</b>Set your preferred DMR master here</span></a></td>
+    <td align="left"><a class="tooltip2" href="#">DMR+ / FreeDMR / HBlink Master:<span><b>DMR+ / FreeDMR / HBlink Master</b>Set your preferred DMR master here</span></a></td>
     <td style="text-align: left;" colspan="3"><select name="dmrMasterHost2" class="dmrMasterHost2">
 <?php
 	$dmrMasterFile2 = fopen("/usr/local/etc/DMR_Hosts.txt", "r");
@@ -4846,7 +5203,7 @@ fclose($dmrMasterFile);
 	while (!feof($dmrMasterFile2)) {
 		$dmrMasterLine2 = fgets($dmrMasterFile2);
                 $dmrMasterHost2 = preg_split('/\s+/', $dmrMasterLine2);
-                if ((strpos($dmrMasterHost2[0], '#') === FALSE ) && (substr($dmrMasterHost2[0], 0, 7) == "SystemX") || (substr($dmrMasterHost2[0], 0, 4) == "DMR+") || (substr($dmrMasterHost2[0], 0, 7) == "FreeDMR") || (substr($dmrMasterHost2[0], 0, 3) == "FD_") || (substr($dmrMasterHost2[0], 0, 3) == "HB_") && ($dmrMasterHost2[0] != '')) {
+                if ((strpos($dmrMasterHost2[0], '#') === FALSE ) && (substr($dmrMasterHost2[0], 0, 4) == "DMR+") || (substr($dmrMasterHost2[0], 0, 7) == "FreeDMR") || (substr($dmrMasterHost2[0], 0, 3) == "FD_") || (substr($dmrMasterHost2[0], 0, 3) == "HB_") && ($dmrMasterHost2[0] != '')) {
                         if (($testMMDVMdmrMaster2 == $dmrMasterHost2[2]) && ($testMMDVMdmrMaster2Port == $dmrMasterHost2[4])) { echo "      <option value=\"$dmrMasterHost2[2],$dmrMasterHost2[3],$dmrMasterHost2[4],$dmrMasterHost2[0]\" selected=\"selected\">$dmrMasterHost2[0]</option>\n"; }
                         else { echo "      <option value=\"$dmrMasterHost2[2],$dmrMasterHost2[3],$dmrMasterHost2[4],$dmrMasterHost2[0]\">$dmrMasterHost2[0]</option>\n"; }
                 }
@@ -4855,13 +5212,13 @@ fclose($dmrMasterFile);
 ?>
     </select></td></tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#">Network Options:<span><b>DMR+ / FreeDMR / HBlink / SystemX Network</b>Set your options= for DMR+ / FreeDMR / HBlink / SystemX here</span></a></td>
+    <td align="left"><a class="tooltip2" href="#">Network Options:<span><b>DMR+ / FreeDMR / HBlink Network</b>Set your options= for DMR+ / FreeDMR / HBlink here</span></a></td>
     <td align="left" colspan="3">
     Options=<input type="text" name="dmrNetworkOptions" size="85" maxlength="250" value="<?php if (isset($configdmrgateway['DMR Network 2']['Options'])) { echo $configdmrgateway['DMR Network 2']['Options']; } ?>" />
     </td>
     </tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#">ESSID:<span><b>DMR+ / FreeDMR / HBlink / SystemX Extended ID</b>This is the extended ID, to make your DMR ID 8 digits long</span></a></td>
+    <td align="left"><a class="tooltip2" href="#">ESSID:<span><b>DMR+ / FreeDMR / HBlink Extended ID</b>This is the extended ID, to make your DMR ID 8 digits long</span></a></td>
     <td align="left" colspan="3">
 <?php
 	if (isset($configdmrgateway['DMR Network 2']['Id'])) {
@@ -4897,10 +5254,90 @@ fclose($dmrMasterFile);
 ?>
     </td></tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#">DMR+ / FreeDMR / HBlink / SystemX Enable:<span><b>DMR+ / FreeDMR / HBlink / SystemX Network Enable</b></span></a></td>
+    <td align="left"><a class="tooltip2" href="#">DMR+ / FreeDMR / HBlink Enable:<span><b>DMR+ / FreeDMR / HBlink Network Enable</b></span></a></td>
+    <td align="left" colspan="2">
+    <?php if ($configdmrgateway['DMR Network 2']['Enabled'] == 1) { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet2En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet2En\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet2EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet2En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable DMR+ / FreeDMR / HBlink\" aria-checked=\"true\" onKeyPress=\"toggleDmrGatewayNet2EnCheckbox()\" onclick=\"toggleDmrGatewayNet2EnCheckbox()\" for=\"toggle-dmrGatewayNet2En\"><font style=\"font-size:0px\">Enable DMR+ / FreeDMR / HBlink</font></label></div>\n"; }
+    else { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet2En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet2En\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet2EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet2En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable DMR+ / FreeDMR / HBlink\" aria-checked=\"false\" onKeyPress=\"toggleDmrGatewayNet2EnCheckbox()\" onclick=\"toggleDmrGatewayNet2EnCheckbox()\" for=\"toggle-dmrGatewayNet2En\"><font style=\"font-size:0px\">Enable DMR+ / FreeDMR / HBlink</font></label></div>\n"; } ?>
+    </td>
+    <td align="left" colspan="1">Uses "8" talkgroup prefix</td>
+    </tr>
+
+    <tr>
+    <th align="left" colspan="4">SystemX Network Settings</th>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#">SystemX Master:<span><b>SystemX Master</b>Set your preferred DMR master here</span></a></td>
+    <td style="text-align: left;" colspan="3"><select name="dmrMasterHost5" class="dmrMasterHost5">
+<?php
+	$dmrMasterFile5 = fopen("/usr/local/etc/DMR_Hosts.txt", "r");
+	$testMMDVMdmrMaster5= $configdmrgateway['DMR Network 5']['Address'];
+	$testMMDVMdmrMaster5Port = $configdmrgateway['DMR Network 5']['Port'];
+	while (!feof($dmrMasterFile5)) {
+		$dmrMasterLine5 = fgets($dmrMasterFile5);
+                $dmrMasterHost5 = preg_split('/\s+/', $dmrMasterLine5);
+                if ((strpos($dmrMasterHost5[0], '#') === FALSE ) && (substr($dmrMasterHost5[0], 0, 7) == "SystemX") && ($dmrMasterHost5[0] != '')) {
+                        if (($testMMDVMdmrMaster5 == $dmrMasterHost5[2]) && ($testMMDVMdmrMaster5Port == $dmrMasterHost5[4])) { echo "      <option value=\"$dmrMasterHost5[2],$dmrMasterHost5[3],$dmrMasterHost5[4],$dmrMasterHost5[0]\" selected=\"selected\">$dmrMasterHost5[0]</option>\n"; }
+                        else { echo "      <option value=\"$dmrMasterHost5[2],$dmrMasterHost5[3],$dmrMasterHost5[4],$dmrMasterHost5[0]\">$dmrMasterHost5[0]</option>\n"; }
+                }
+	}
+	fclose($dmrMasterFile5);
+?>
+    </select></td></tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#">Network Options:<span><b>SystemX Network</b>Set your options= for SystemX here</span></a></td>
     <td align="left" colspan="3">
-    <?php if ($configdmrgateway['DMR Network 2']['Enabled'] == 1) { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet2En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet2En\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet2EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet2En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable DMR+ / FreeDMR / HBlink / SystemX\" aria-checked=\"true\" onKeyPress=\"toggleDmrGatewayNet2EnCheckbox()\" onclick=\"toggleDmrGatewayNet2EnCheckbox()\" for=\"toggle-dmrGatewayNet2En\"><font style=\"font-size:0px\">Enable DMR+ / FreeDMR / HBlink / SystemX</font></label></div>\n"; }
-    else { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet2En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet2En\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet2EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet2En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable DMR+ / FreeDMR / HBlink / SystemX\" aria-checked=\"false\" onKeyPress=\"toggleDmrGatewayNet2EnCheckbox()\" onclick=\"toggleDmrGatewayNet2EnCheckbox()\" for=\"toggle-dmrGatewayNet2En\"><font style=\"font-size:0px\">Enable DMR+ / FreeDMR / HBlink / SystemX</font></label></div>\n"; } ?>
+    Options=<input type="text" name="dmrNetworkOptions5" size="85" maxlength="250" value="<?php if (isset($configdmrgateway['DMR Network 5']['Options'])) { echo $configdmrgateway['DMR Network 5']['Options']; } ?>" />
+    </td>
+    </tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#">ESSID:<span><b>SystemX Extended ID</b>This is the extended ID, to make your DMR ID 8 digits long</span></a></td>
+    <td align="left" colspan="3">
+<?php
+	if (isset($configdmrgateway['DMR Network 5']['Id'])) {
+		if (strlen($configdmrgateway['DMR Network 5']['Id']) > strlen($configmmdvm['General']['Id'])) {
+			$SysXESSID = substr($configdmrgateway['DMR Network 5']['Id'], -2);
+		} else {
+			$SysXESSID = "None";
+		}
+	} else {
+		if (isset($configmmdvm['General']['Id'])) {
+			if (strlen($configmmdvm['General']['Id']) == 9) {
+				$SysXESSID = substr($configmmdvm['General']['Id'], -2);
+			} else {
+				$SysXESSID = "None";
+			}
+		} else {
+			$SysXESSID = "None";
+		}
+	}
+
+	if (isset($configmmdvm['General']['Id'])) { if ($configmmdvm['General']['Id'] !== "1234567") { echo substr($configmmdvm['General']['Id'], 0, 7); } }
+	echo "<select name=\"SystemXExtendedId\">\n";
+	if ($SysXESSID == "None") { echo "      <option value=\"None\" selected=\"selected\">None</option>\n"; } else { echo "      <option value=\"None\">None</option>\n"; }
+	for ($SysXESSIDInput = 1; $SysXESSIDInput <= 99; $SysXESSIDInput++) {
+		$SysXESSIDInput = str_pad($SysXESSIDInput, 2, "0", STR_PAD_LEFT);
+		if ($SysXESSID === $SysXESSIDInput) {
+			echo "      <option value=\"$SysXESSIDInput\" selected=\"selected\">$SysXESSIDInput</option>\n";
+		} else {
+			echo "      <option value=\"$SysXESSIDInput\">$SysXESSIDInput</option>\n";
+		}
+	}
+	echo "</select>\n";
+?>
+    </td></tr>
+    <tr>
+    <td align="left"><a class="tooltip2" href="#">SystemX Enable:<span><b>SystemX Network Enable</b></span></a></td>
+    <td align="left" colspan="2">
+    <?php if ($configdmrgateway['DMR Network 5']['Enabled'] == 1) { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet5En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet5En\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet5EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet5En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable SystemX\" aria-checked=\"true\" onKeyPress=\"toggleDmrGatewayNet5EnCheckbox()\" onclick=\"toggleDmrGatewayNet5EnCheckbox()\" for=\"toggle-dmrGatewayNet5En\"><font style=\"font-size:0px\">Enable SystemX</font></label></div>\n"; }
+    else { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet5En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet5En\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet5EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet5En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable SystemX\" aria-checked=\"false\" onKeyPress=\"toggleDmrGatewayNet5EnCheckbox()\" onclick=\"toggleDmrGatewayNet5EnCheckbox()\" for=\"toggle-dmrGatewayNet5En\"><font style=\"font-size:0px\">Enable SystemX</font></label></div>\n"; } ?>
+    </td>
+    <td align="left" colspan="1">Uses "4" talkgroup prefix</td>
+    </tr>
+	</tr>
+	<tr>
+    <td align="left"><a class="tooltip2" href="#">SystemX Network:<span><b>SystemX Tools</b>Direct links to your SystemX tools</span></a></td>
+    <td colspan="3" align="left">
+    <a href="https://freestar.network/tools/systemx-options-generator.php" target="_new">Options Generator</a>
     </td>
     </tr>
 
@@ -4957,7 +5394,7 @@ fclose($dmrMasterFile);
     <?php if ($configdmrgateway['DMR Network 4']['Enabled'] == 1) { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet4En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet4En\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet4EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet4En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable TGIF\" aria-checked=\"true\" onKeyPress=\"toggleDmrGatewayNet4EnCheckbox()\" onclick=\"toggleDmrGatewayNet4EnCheckbox()\" for=\"toggle-dmrGatewayNet4En\"><font style=\"font-size:0px\">Enable TGIF/font></label></div>\n"; }
     else { echo "<div class=\"switch\"><input id=\"toggle-dmrGatewayNet4En\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"dmrGatewayNet4En\" value=\"ON\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrGatewayNet4EnCheckboxCr." /><label id=\"aria-toggle-dmrGatewayNet4En\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable TGIF\" aria-checked=\"false\" onKeyPress=\"toggleDmrGatewayNet4EnCheckbox()\" onclick=\"toggleDmrGatewayNet4EnCheckbox()\" for=\"toggle-dmrGatewayNet4En\"><font style=\"font-size:0px\">Enable TGIF</font></label></div>\n"; } ?>
     </td>
-    <td align="left" colspan="1">Uses 5 prefix on DMRGateway</td>
+    <td align="left" colspan="1">Uses "5" talkgroup prefix</td>
     </tr>
     <tr>
     <td align="left"><a class="tooltip2" href="#">TGIF Network:<span><b>TGIF Dashboards</b>Direct links to your TGIF Dashboard</span></a></td>
@@ -5084,7 +5521,7 @@ fclose($dmrMasterFile);
     <th align="left" colspan="4">System-Wide DMR Settings</th>
     </tr>
     <tr>
-    <td align="left"><a class="tooltip2" href="#">DMR Roaming Beacon:<span><b>Enable DMR Roaming Beacon</b>Enable DMR Roaming Beacons</span></a></td>
+    <td align="left"><a class="tooltip2" href="#">DMR Roaming Beacon:<span><b>Enable DMR Roaming Beacon</b>Enable DMR Roaming Beacons; Used for repeaters</span></a></td>
     <?php
     if ($configmmdvm['DMR']['Beacons'] == 1) {
         echo "<td align=\"left\" colspan=\"2\"><div class=\"switch\"><input id=\"toggle-dmrbeacon\" class=\"toggle toggle-round-flat\" type=\"checkbox\" name=\"DMRBeaconEnable\" value=\"ON\" checked=\"checked\" aria-hidden=\"true\" tabindex=\"-1\" ".$toggleDmrBeaconCr." /><label id=\"aria-toggle-dmrbeacon\" role=\"checkbox\" tabindex=\"0\" aria-label=\"Enable Beaconing\" aria-checked=\"true\" onKeyPress=\"toggleDmrBeacon()\" onclick=\"toggleDmrBeacon()\" for=\"toggle-dmrbeacon\"><font style=\"font-size:0px\">Enable DMR Beaconing</font></label></div>\n";
@@ -5204,7 +5641,8 @@ fclose($dmrMasterFile);
     </tr>
     <tr>
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['dstar_irc_password'];?>:<span><b>Remote Password</b>Used for ircDDBGateway remote control access</span></a></td>
-    <td align="left" colspan="2"><input type="password" name="confPassword" size="30" maxlength="30" value="<?php echo $configs['remotePassword'] ?>" /></td>
+    <td align="left" colspan="2"><input type="password" name="confPassword" id="ircddbPass" size="30" maxlength="30" value="<?php echo $configs['remotePassword'] ?>" />
+    <span toggle="#password-field" class="fa fa-fw fa-eye field_icon toggle-ircddb-password"></span></td>
     </tr>
     <tr>
     <td align="left"><a class="tooltip2" href="#"><?php echo $lang['dstar_default_ref'];?>:<span><b>Default Reflector</b>Used for setting the default reflector.</span></a></td>
@@ -5463,6 +5901,12 @@ $ysfHosts = fopen("/usr/local/etc/YSFHosts.txt", "r"); ?>
 				    }
 				    ?>
 				</tr>
+				<tr>
+    				<td align="left"><a class="tooltip2" href="#">YCS Network Options:<span><b>YCS Network</b>Set your options= for the YCS Network here!</span></a></td>
+    				<td align="left" colspan="3">
+    				Options=<input type="text" name="ysfgatewayNetworkOptions" size="85" maxlength="250" value="<?php if (isset($configysfgateway['Network']['Options'])) { echo $configysfgateway['Network']['Options']; } ?>" />
+    			</td>
+    			</tr>
 				<?php
 				}
 				?>
@@ -5858,7 +6302,8 @@ $p25Hosts = fopen("/usr/local/etc/P25Hosts.txt", "r");
       </tr>
       <tr>
         <td align="left"><a class="tooltip2" href="#">DAPNET AuthKey:<span><b>DAPNET AuthKey</b>Set your DAPNET AuthKey here</span></a></td>
-        <td align="left"><input type="password" name="pocsagAuthKey" size="30" maxlength="50" value="<?php echo $configdapnetgw['DAPNET']['AuthKey'];?>" /></td>
+        <td align="left"><input type="password" name="pocsagAuthKey" id="pocsagAuthKey" size="30" maxlength="50" value="<?php echo $configdapnetgw['DAPNET']['AuthKey'];?>" />
+	<span toggle="#password-field" class="fa fa-fw fa-eye field_icon toggle-dapnet-password"></span>
       </tr>
       <tr>
         <td align="left"><a class="tooltip2" href="#">POCSAG Whitelist:<span><b>POCSAG Whitelist</b>Set your POCSAG RIC Whitelist here, if these are set ONLY these RICs will be transmitted. List is comma seperated.</span></a></td>
@@ -5967,10 +6412,12 @@ echo '
     <td align="right"><input type="button" id="submitpsk" value="Set PSK" onclick="submitPskform()" disabled="disabled" /></td>
     </tr>
     </table>
-    </form>';} ?>
+    </form>';
+    }
+?>
 
 <br />
-	<h2 class="ConfSec"><?php echo $lang['remote_access_pw'];?></h2>
+    <h2 class="ConfSec"><?php echo $lang['remote_access_pw'];?></h2>
     <form id="adminPassForm" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
     <table>
     <tr><th width="200"><?php echo $lang['user'];?></th><th colspan="3"><?php echo $lang['password'];?></th></tr>
@@ -5988,8 +6435,8 @@ echo '
 <br />
 </div>
 <div class="footer">
-2022-<?php echo date("Y"); ?>.<br />
-<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov
+Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-<?php echo date("Y"); ?>.<br />
+<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP
 <br />
 </div>
 </div>
@@ -5997,18 +6444,20 @@ echo '
 </html>
 
 <?php 
-} else { ?>
+} else {
+?>
 <br />
 <br />
 </div>
 <div class="footer">
-2022-<?php echo date("Y"); ?>.<br />
-<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov
+Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-<?php echo date("Y"); ?>.<br />
+<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP
 <br />
 </div>
 </div>
 </body>
 </html>
-<?php } 
+<?php
+    } 
 }
 ?>

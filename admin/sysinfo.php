@@ -82,6 +82,15 @@ function formatSize( $bytes ) {
     for( $i = 0; $bytes >= 1024 && $i < ( count( $types ) -1 ); $bytes /= 1024, $i++ );
     return( round( $bytes, 2 ) . " " . $types[$i] );
 }
+
+function timesyncdProc() {
+    $cmd = exec('systemctl status systemd-timesyncd.service | grep -o running');
+    if (strpos($cmd, "running") !== false) {
+	return 1;
+    } else {
+	return 0;
+    }
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 	  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -91,15 +100,12 @@ function formatSize( $bytes ) {
 	<meta name="robots" content="follow" />
 	<meta name="language" content="English" />
 	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	<meta name="Author" content="Andrew Taylor (MW0MWZ), Chip Cuccio (W0CHP)" />
-	<meta name="Description" content="Pi-Star Hardware/Software Details" />
-	<meta name="KeyWords" content="MMDVMHost,ircDDBGateway,D-Star,ircDDB,DMRGateway,DMR,YSFGateway,YSF,C4FM,NXDNGateway,NXDN,P25Gateway,P25,Pi-Star,DL5DI,DG9VH,MW0MWZ,W0CHP" />
 	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 	<meta http-equiv="pragma" content="no-cache" />
 	<link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
 	<meta http-equiv="Expires" content="0" />
 	<title>Pi-Star - Hardware/Software Details</title>
-	<link rel="stylesheet" type="text/css" href="/css/pistar-css.php?version=<?php echo $versionCmd; ?>" />
+<?php include_once $_SERVER['DOCUMENT_ROOT'].'/config/browserdetect.php'; ?>
 	<link rel="stylesheet" type="text/css" href="/css/font-awesome-4.7.0/css/font-awesome.min.css" />
 	<script type="text/javascript" src="/js/jquery.min.js?version=<?php echo $versionCmd; ?>"></script>
 	<script type="text/javascript" src="/js/jquery-timing.min.js?version=<?php echo $versionCmd; ?>"></script>
@@ -124,8 +130,12 @@ function formatSize( $bytes ) {
 	 function refreshTable () {
 	     $("#infotable").load(" #infotable > *");
 	 }
+	 var timer = setInterval(function(){refreshTable()}, 5000);
 
-	 var timer = setInterval(function(){refreshTable()}, 15000);
+	 function refreshTS () {
+	     $("#synctable").load(" #synctable > *");
+	 }
+	 var timer = setInterval(function(){refreshTS()}, 2000);
 	</script>
     </head>
     <body>
@@ -138,14 +148,14 @@ function formatSize( $bytes ) {
               <script type= "text/javascript">
                $(document).ready(function() {
                  setInterval(function() {
-                   $("#timer").load("/dstarrepeater/datetime.php");
+                   $("#timer").load("/includes/datetime.php");
                    }, 1000);
 
                  function update() {
                    $.ajax({
                      type: 'GET',
                      cache: false,
-                     url: '/dstarrepeater/datetime.php',
+                     url: '/includes/datetime.php',
                      timeout: 1000,
                      success: function(data) {
                        $("#timer").html(data); 
@@ -284,12 +294,34 @@ function formatSize( $bytes ) {
                         $NEXTIONDRIVER_Ver = exec('/usr/local/bin/NextionDriver -V | head -n 2 | cut -d\' \' -f 3');
                         echo "  <tr>";getStatusClass(isProcessRunning("NextionDriver"), true); echo "NextionDriver</td><td align=\"left\">".$NEXTIONDRIVER_Ver."</td></tr>\n";
                     }
+?>
+		</table>
+		<br />
+		<table id="synctable" width="100%" border="0">
+<?php
+		    // time sync status
+		    echo "<tr><th colspan='2' align='left'>Time Synchronization Status</th></tr>";
+		    echo "<tr>";
+		    if (timesyncdProc() == "1") {
+			echo "<td align='left' colspan='2'>";
+			echo "<pre>";
+			system("timedatectl | sed -e 's/^[ \t]*/  /' | sed '/RTC/d'");
+			echo "</pre>";
+			echo "<pre>";
+			system("timedatectl timesync-status | sed -e 's/^[ \t]*/  /'");
+			echo "</pre>";
+			echo "</td>";
+		    } else {
+			echo "<td align='left' class='inactive-service-cell' colspan='2'>TimeSync Deamon not running!</td>";
+		    }
+		    echo "</tr>";
+
 		    ?>
 		</table>
 	    </div>
 	    <div class="footer">
-		2022-<?php echo date("Y"); ?>.<br />
-		<a href="" style="color: #ffffff; text-decoration:underline;">Dashboard</a> predelal Petr Barrandov<br />
+		Pi-Star web config, &copy; Andy Taylor (MW0MWZ) 2014-<?php echo date("Y"); ?>.<br />
+		<a href="https://w0chp.net/w0chp-pistar-dash/" style="color: #ffffff; text-decoration:underline;">W0CHP-PiStar-Dash</a> by W0CHP<br />
 	    </div>
 	</div>
     </body>
